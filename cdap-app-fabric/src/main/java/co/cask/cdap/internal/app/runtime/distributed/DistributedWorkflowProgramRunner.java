@@ -50,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -105,11 +106,21 @@ public final class DistributedWorkflowProgramRunner extends AbstractDistributedP
     // Adds the extra class that Spark runtime needed
     ProgramRuntimeProvider provider = runtimeProviderLoader.get(ProgramType.SPARK);
     if (provider != null) {
-      extraDependencies.add(provider.getClass());
-
-      // Localize the spark-assembly jar and spark conf zip
-      String sparkAssemblyJarName = SparkUtils.prepareSparkResources(tempDir, localizeResources);
-      extraClassPaths.add(sparkAssemblyJarName);
+      try {
+        // Try to add the spark jars.
+        extraDependencies.add(provider.getClass());
+        // Localize the spark-assembly jar and spark conf zip
+        String sparkAssemblyJarName = SparkUtils.prepareSparkResources(tempDir, localizeResources);
+        extraClassPaths.add(sparkAssemblyJarName);
+      } catch (IllegalStateException e) {
+        // If spark is not installed on the cluster then an exception will be thrown.
+        if (!driverMeta.hasSpark) {
+          // The driver doesn't have Spark so okay to ignore this error
+          LOG.trace("Spark is not installed on the cluster and driver doesn't have Spark.");
+        } else {
+          throw new IllegalStateException("Missing Spark runtime system. Not able to run Spark program in Workflow.");
+        }
+      }
     } else if (driverMeta.hasSpark) {
       // If the workflow contains spark and yet the spark runtime provider is missing, then it's an error.
       throw new IllegalStateException("Missing Spark runtime system. Not able to run Spark program in Workflow.");
