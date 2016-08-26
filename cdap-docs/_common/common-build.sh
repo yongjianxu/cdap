@@ -91,7 +91,6 @@ else
   NO_COLOR=''
 fi
 WARNING="${RED_BOLD}WARNING:${NO_COLOR}"
-SPHINX_BUILD="sphinx-build ${SPHINX_COLOR} -b html -d ${TARGET}/doctrees"
 
 # Hash of file with "Not Found"; returned by GitHub
 NOT_FOUND_HASHES=("9d1ead73e678fa2f51a70a933b0bf017" "6cb875b80d51f9a26eb05db7f9779011")
@@ -120,7 +119,8 @@ function usage() {
   echo "    build-web            Clean build and zip for placing on docs.cask.co webserver (no Javadocs)"
   echo "    build-docs           Clean build of docs (no Javadocs)"
   echo "    docs                 alias for 'build-docs'"
-  echo "    docs-local           Clean build of docs (no Javadocs), using local copies of downloaded files"
+  echo "    docs-local           Clean build of docs (no Javadocs), using local copies of downloaded files" 
+  echo "    docs-single          Clean build of HTML, single pages, zipped, with docs.cask.co code, skipping Javadocs"
   echo
   echo "    license-pdfs         Clean build of License Dependency PDFs"
   echo "    check-includes       Check if included files have changed from source"
@@ -143,12 +143,21 @@ function clean() {
   echo
 }
 
+function set_sphinx_build() {
+  if [ "x${SPHINX_BUILDER}" == "x" ]; then
+    SPHINX_BUILDER="html"
+  fi
+  SPHINX_BUILD="sphinx-build ${SPHINX_COLOR} -b ${SPHINX_BUILDER} -d ${TARGET}/doctrees"
+}
+
 function build_docs() {
   clean
   cd ${SCRIPT_PATH}
   check_includes
+  set_sphinx_build
   ${SPHINX_BUILD} -w ${TARGET}/${SPHINX_MESSAGES} ${SOURCE} ${TARGET}/html
   consolidate_messages
+  cleanup_build_docs
 }
 
 function build_docs_local() {
@@ -158,12 +167,20 @@ function build_docs_local() {
   build_docs
 }
 
+function build_docs_single() {
+  SPHINX_BUILDER="singlehtml"
+  export SPHINX_BUILDER
+  build_docs
+}
+
 function build_docs_google() {
   clean
   cd ${SCRIPT_PATH}
   check_includes
+  set_sphinx_build
   ${SPHINX_BUILD} -w ${TARGET}/${SPHINX_MESSAGES} -A html_google_tag_manager_code=$1 ${SOURCE} ${TARGET}/html
   consolidate_messages
+  cleanup_build_docs
 }
 
 function build_license_pdfs() {
@@ -222,6 +239,11 @@ function build_extras() {
   # Over-ride this function in guides where Javadocs or licenses are being built or copied.
   # Currently performed in reference-manual
   echo "No extras being built or copied."
+}
+
+function cleanup_build_docs() {
+  # Over-ride this function to perform any cleanup required.
+  echo "No cleanup being performed."
 }
 
 function set_mvn_environment() {
@@ -565,6 +587,7 @@ function run_command() {
     license-pdfs)                                 "build_license_pdfs";;
     docs)                                         "build_docs";;
     docs-local)                                   "build_docs_local";;
+    docs-single )                                 "build_docs_single";;
     *)                                            usage;;
   esac
 }

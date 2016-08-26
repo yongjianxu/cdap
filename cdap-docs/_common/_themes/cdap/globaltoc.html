@@ -30,7 +30,7 @@
 {%- set link_only_global_toc = false %}
 {%- set link_only_global_toc_key = 'link-only-global-toc' %}
 
-{%- if meta is defined %}
+{%- if meta is defined and meta %}
     {%- if hide_global_toc_key in meta %}
       {%- set hide_global_toc = meta[hide_global_toc_key] == 'true' %}
     {%- endif %}

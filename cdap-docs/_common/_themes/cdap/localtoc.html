@@ -16,7 +16,7 @@
 
 {%- set hide_local_toc = false %}
 {%- set hide_local_toc_key = 'hide-local-toc' %}
-{%- if meta is defined %}
+{%- if meta is defined and meta %}
     {%- if hide_local_toc_key in meta %}
       {%- set hide_local_toc = meta[hide_local_toc_key] == 'true' %}
     {%- endif %}

@@ -140,7 +140,7 @@
 #}
     {%- set section_numbering = '' %}
     {%- set section_numbering_key = 'section-numbering' %}
-    {%- if meta is defined %}
+    {%- if meta is defined and meta %}
         {%- if section_numbering_key in meta %}
             {%- set section_numbering = meta[section_numbering_key] %}
         {%- endif %}
@@ -154,7 +154,7 @@
 #}
     {%- set hidetoc = '' %}
     {%- set hidetoc_key = 'hide-toc' %}
-    {%- if meta is defined %}
+    {%- if meta is defined and meta %}
         {%- if hidetoc_key in meta %}
             {%- set hidetoc = meta[hidetoc_key] %}
         {%- endif %}
@@ -167,7 +167,7 @@
 #}
     {%- set hidenav = '' %}
     {%- set hidenav_key = 'hide-nav' %}
-    {%- if meta is defined %}
+    {%- if meta is defined and meta %}
         {%- if hidenav_key in meta %}
             {%- set hidenav = meta[hidenav_key] %}
         {%- endif %}
@@ -270,7 +270,7 @@
 {#  Code to check relations, controlled by setting in the field list at the top :hide-relations: true #}
 {%- set hiderel = '' %}
 {%- set hiderel_key = 'hide-relations' %}
-{%- if meta is defined %}
+{%- if meta is defined and meta %}
     {%- if hiderel_key in meta %}
         {%- set hiderel = meta[hiderel_key] %}
     {%- endif %}

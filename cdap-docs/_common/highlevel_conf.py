@@ -49,13 +49,16 @@ def build_common_index(app, exception):
     if exception:
         return
     master = load_index(builder)
-    clean(master)
+    if master:
+        clean(master)
     
-    for manual_dir in get_manual_dirs():
-        index = load_index(builder, "../../%s/%s/html" % (manual_dir, target))
-        master = merge(master, index, manual_dir)
+        for manual_dir in get_manual_dirs():
+            index = load_index(builder, "../../%s/%s/html" % (manual_dir, target))
+            master = merge(master, index, manual_dir)
     
-    dump_search_index(builder, master)
+        dump_search_index(builder, master)
+    else:
+        builder.warn('Master index couldn\'t be created')
 
 
 # Load index from a js file
@@ -96,30 +99,44 @@ def dump_search_index(builder, index):
     builder.info('done')
 
 
-FILENAMES = 'filenames'
-TERMS = 'terms'
-TITLES = 'titles'
-TITLETERMS = 'titleterms'
+FILENAMES = u'filenames'
+TERMS = u'terms'
+TITLES = u'titles'
+TITLETERMS = u'titleterms'
 
 # Remove all references to subdirectories from master as they are replaced
 def clean(master):
-    for ref in range(len(master[FILENAMES])):
-        file = master[FILENAMES][ref]
-        if file_to_be_removed(file):
-#             print "File to be removed:%s ref:%s" % (file, ref)
-            terms_to_remove = []
-            # Remove any file number references
-            for term in master[TERMS]:
-                files = master[TERMS][term]
-                if isinstance(files, list) and ref in files:
-                    files.remove(ref)
-                    master[TERMS][term] = files
-#                     print "Deleted list reference: %s of term %s from %s" % (ref, term, files)
-                elif ref == files or [ref] == files: # A single file reference
-#                     print "Deleting single reference: %s of term %s" % (ref, term)
-                    terms_to_remove.append(term)
-            for term in terms_to_remove:
-                del master[TERMS][term]
+#     for ref in range(len(master[FILENAMES])):
+#         file = master[FILENAMES][ref]
+#         if file_to_be_removed(file):
+# #             print "File to be removed:%s ref:%s" % (file, ref)
+#             terms_to_remove = []
+#             # Remove any file number references
+#             for term in master[TERMS]:
+#                 files = master[TERMS][term]
+#                 if isinstance(files, list) and ref in files:
+#                     files.remove(ref)
+#                     master[TERMS][term] = files
+# #                     print "Deleted list reference: %s of term %s from %s" % (ref, term, files)
+#                 elif ref == files or [ref] == files: # A single file reference
+# #                     print "Deleting single reference: %s of term %s" % (ref, term)
+#                     terms_to_remove.append(term)
+#             for term in terms_to_remove:
+#                 del master[TERMS][term]
+    if master and hasattr(master, FILENAMES):
+        for ref in range(len(master[FILENAMES])):
+            file = master[FILENAMES][ref]
+            if file.endswith("/index"):
+                # Remove any file number references
+                if hasattr(master, TERMS):
+                    for term in master[TERMS]:
+                        files = master[TERMS][term]
+                        if isinstance(files, list) and ref in files:
+                            master[TERMS][term] = files.remove(ref)
+                            print "Deleted list reference: %s" % ref             
+                        elif ref == files: # A single file reference
+                            del master[TERMS][term]
+                            print "Deleted single reference: %s" % ref             
                                
 
 def file_to_be_removed(file):
