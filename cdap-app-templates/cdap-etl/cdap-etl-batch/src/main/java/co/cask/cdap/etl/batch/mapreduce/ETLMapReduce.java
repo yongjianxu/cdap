@@ -51,6 +51,7 @@ import co.cask.cdap.etl.log.LogStageInjector;
 import co.cask.cdap.etl.planner.StageInfo;
 import co.cask.cdap.internal.io.SchemaTypeAdapter;
 import com.google.common.base.Joiner;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
@@ -153,6 +154,7 @@ public class ETLMapReduce extends AbstractMapReduce {
 
   @Override
   public void initialize() throws Exception {
+    Stopwatch sw = new Stopwatch().start();
     MapReduceContext context = getContext();
     if (Boolean.valueOf(context.getSpecification().getProperty(Constants.STAGE_LOGGING_ENABLED))) {
       LogStageInjector.start();
@@ -174,6 +176,7 @@ public class ETLMapReduce extends AbstractMapReduce {
     PipelinePluginInstantiator pluginInstantiator = new PipelinePluginInstantiator(context, phaseSpec);
 
     Map<String, String> inputAliasToStage = new HashMap<>();
+    LOG.info("alianwar4: " + sw.elapsedMillis());
     for (String sourceName : phaseSpec.getPhase().getSources()) {
       BatchConfigurable<BatchSourceContext> batchSource = pluginInstantiator.newPluginInstance(sourceName, evaluator);
       batchSource = new LoggedBatchConfigurable<>(sourceName, batchSource);
@@ -188,6 +191,7 @@ public class ETLMapReduce extends AbstractMapReduce {
       finishers.add(batchSource, sourceContext);
     }
     hConf.set(INPUT_ALIAS_KEY, GSON.toJson(inputAliasToStage));
+    LOG.info("alianwar4: " + sw.elapsedMillis());
 
     Map<String, SinkOutput> sinkOutputs = new HashMap<>();
     for (StageInfo stageInfo : Sets.union(phase.getStagesOfType(Constants.CONNECTOR_TYPE),
@@ -212,6 +216,7 @@ public class ETLMapReduce extends AbstractMapReduce {
     finisher = finishers.build();
     hConf.set(SINK_OUTPUTS_KEY, GSON.toJson(sinkOutputs));
 
+    LOG.info("alianwar4: " + sw.elapsedMillis());
     // setup time partition for each error dataset
     for (StageInfo stageInfo : Sets.union(phase.getStagesOfType(Transform.PLUGIN_TYPE),
                                           phase.getStagesOfType(BatchSink.PLUGIN_TYPE))) {
@@ -223,6 +228,7 @@ public class ETLMapReduce extends AbstractMapReduce {
         context.addOutput(Output.ofDataset(stageInfo.getErrorDatasetName(), args));
       }
     }
+    LOG.info("alianwar4: " + sw.elapsedMillis());
     job.setMapperClass(ETLMapper.class);
 
     Set<StageInfo> reducers = phaseSpec.getPhase().getStagesOfType(BatchAggregator.PLUGIN_TYPE,
@@ -290,6 +296,7 @@ public class ETLMapReduce extends AbstractMapReduce {
     }
 
     hConf.set(RUNTIME_ARGS_KEY, GSON.toJson(runtimeArgs));
+    LOG.info("alianwar4: " + sw.elapsedMillis());
   }
 
   private Class<?> getOutputKeyClass(String reducerName, Class<?> outputKeyClass) {

@@ -669,6 +669,12 @@ public class DataPipelineTest extends HydratorTestBase {
 
   @Test
   public void testPostAction() throws Exception {
+    for (int i = 0; i < 10; i++) {
+      testPostAction2();
+    }
+  }
+
+  public void testPostAction2() throws Exception {
     ETLBatchConfig etlConfig = ETLBatchConfig.builder("* * * * *")
       .addStage(new ETLStage("source", MockSource.getPlugin("actionInput")))
       .addStage(new ETLStage("sink", MockSink.getPlugin("actionOutput")))
