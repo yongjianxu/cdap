@@ -186,23 +186,35 @@ function build_javadocs() {
   fi
   local start=`date`
   cd ${PROJECT_PATH}
-  echo "Maven clean package debug_flag: '${debug_flag}'"
-  MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn clean package -P examples,templates,release -DskipTests -Dgpg.skip=true ${debug_flag}
+  
+#   echo "Maven clean package debug_flag: '${debug_flag}'"
+#   MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn clean package -P examples,templates,release -DskipTests -Dgpg.skip=true ${debug_flag}
+#   warnings=$?
+#   if [[ ${warnings} -eq 0 ]]; then
+#     echo "Maven javadoc_run: '${javadoc_run}' debug_flag: '${debug_flag}'"
+#     MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn ${javadoc_run} -DskipTests -DisOffline=false ${debug_flag}
+#     warnings=$?
+#     if [[ ${warnings} -eq 0 ]]; then
+#       echo
+#       echo "Javadocs Build Start: ${start}"
+#       echo "                 End: `date`"
+#     else
+#       echo_set_message "Error building Javadocs: ${warnings}"
+#     fi
+#   else
+#     echo_set_message "Error building Javadocs: Maven clean package: ${warnings}"
+#   fi
+
+  MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn clean package -P examples,templates,release ${javadoc_run} -DisOffline=false -DskipTests -Dgpg.skip=true ${debug_flag}
   warnings=$?
   if [[ ${warnings} -eq 0 ]]; then
-    echo "Maven javadoc_run: '${javadoc_run}' debug_flag: '${debug_flag}'"
-    MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn ${javadoc_run} -DskipTests -DisOffline=false ${debug_flag}
-    warnings=$?
-    if [[ ${warnings} -eq 0 ]]; then
-      echo
-      echo "Javadocs Build Start: ${start}"
-      echo "                 End: `date`"
-    else
-      echo_set_message "Error building Javadocs: ${warnings}"
-    fi
+    echo
+    echo "Javadocs Build Start: ${start}"
+    echo "                 End: `date`"
   else
-    echo_set_message "Error building Javadocs: Maven clean package: ${warnings}"
+    echo_set_message "Error building Javadocs: javadoc_run: ${javadoc_run}: ${warnings}"
   fi
+
   display_end_title ${title}
   return ${warnings}
 }
