@@ -19,7 +19,7 @@ package co.cask.cdap.messaging.store;
 /**
 * Container class for raw bytes corresponding to key, value of the Payload Table.
 */
-public class RawPayloadTableEntry {
+public final class RawPayloadTableEntry {
   private byte[] key;
   private byte[] value;
 

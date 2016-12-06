@@ -14,30 +14,29 @@
  * the License.
  */
 
-package co.cask.cdap.data2.dataset2.lib.partitioned;
+package co.cask.cdap.app.preview;
+
+import co.cask.cdap.proto.artifact.AppRequest;
+import co.cask.cdap.proto.id.ProgramId;
 
 /**
- * Represents an operation on a particular path. Must be used in context of a base location, because the path is a
- * relative path.
+ * Represents the preview application request.
+ * @param <T> the type of application config
  */
-final class PathOperation {
-  private final String relativePath;
-  private final OperationType operationType;
+public class PreviewRequest<T> {
+  private final ProgramId program;
+  private final AppRequest<T> appRequest;
 
-  enum OperationType {
-    CREATE, DROP
+  public PreviewRequest(ProgramId program, AppRequest<T> appRequest) {
+    this.program = program;
+    this.appRequest = appRequest;
   }
 
-  PathOperation(String relativePath, OperationType operationType) {
-    this.relativePath = relativePath;
-    this.operationType = operationType;
+  public ProgramId getProgram() {
+    return program;
   }
 
-  public String getRelativePath() {
-    return relativePath;
-  }
-
-  public OperationType getOperationType() {
-    return operationType;
+  public AppRequest<T> getAppRequest() {
+    return appRequest;
   }
 }

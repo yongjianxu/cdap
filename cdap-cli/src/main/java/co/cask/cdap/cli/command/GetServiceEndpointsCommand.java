@@ -25,7 +25,6 @@ import co.cask.cdap.cli.CommandCategory;
 import co.cask.cdap.cli.ElementType;
 import co.cask.cdap.cli.english.Article;
 import co.cask.cdap.cli.english.Fragment;
-import co.cask.cdap.cli.exception.CommandInputError;
 import co.cask.cdap.cli.util.AbstractAuthCommand;
 import co.cask.cdap.cli.util.RowMaker;
 import co.cask.cdap.cli.util.table.Table;
@@ -53,7 +52,7 @@ public class GetServiceEndpointsCommand extends AbstractAuthCommand implements C
 
   @Override
   public void perform(Arguments arguments, PrintStream output) throws Exception {
-    ServiceId serviceId = parseServiceId(arguments);
+    ServiceId serviceId = new ServiceId(parseProgramId(arguments, ElementType.SERVICE));
     List<ServiceHttpEndpoint> endpoints = serviceClient.getEndpoints(serviceId);
 
     Table table = Table.builder()
@@ -69,7 +68,7 @@ public class GetServiceEndpointsCommand extends AbstractAuthCommand implements C
 
   @Override
   public String getPattern() {
-    return String.format("get endpoints service <%s>", ArgumentName.SERVICE);
+    return String.format("get endpoints service <%s> [version <%s>]", ArgumentName.SERVICE, ArgumentName.APP_VERSION);
   }
 
   @Override

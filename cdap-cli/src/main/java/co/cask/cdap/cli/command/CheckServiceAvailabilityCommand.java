@@ -24,7 +24,6 @@ import co.cask.cdap.cli.CommandCategory;
 import co.cask.cdap.cli.ElementType;
 import co.cask.cdap.cli.english.Article;
 import co.cask.cdap.cli.english.Fragment;
-import co.cask.cdap.cli.exception.CommandInputError;
 import co.cask.cdap.cli.util.AbstractAuthCommand;
 import co.cask.cdap.client.ServiceClient;
 import co.cask.cdap.proto.id.ServiceId;
@@ -47,14 +46,15 @@ public class CheckServiceAvailabilityCommand extends AbstractAuthCommand impleme
 
   @Override
   public void perform(Arguments arguments, PrintStream output) throws Exception {
-    ServiceId serviceId = parseServiceId(arguments);
+    ServiceId serviceId = new ServiceId(parseProgramId(arguments, ElementType.SERVICE));
     serviceClient.checkAvailability(serviceId);
     output.println("Service is available to accept requests.");
   }
 
   @Override
   public String getPattern() {
-    return String.format("check service availability <%s>", ArgumentName.SERVICE);
+    return String.format("check service availability <%s> [version <%s>]", ArgumentName.SERVICE,
+                         ArgumentName.APP_VERSION);
   }
 
   @Override

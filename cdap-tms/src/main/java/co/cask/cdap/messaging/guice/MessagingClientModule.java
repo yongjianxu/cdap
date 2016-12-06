@@ -13,23 +13,22 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package co.cask.cdap.internal.app.services;
 
-import co.cask.cdap.gateway.handlers.preview.PreviewHttpHandler;
-import co.cask.cdap.internal.app.services.http.AppFabricTestBase;
-import co.cask.cdap.proto.id.ApplicationId;
-import org.junit.Test;
+package co.cask.cdap.messaging.guice;
 
-import java.util.HashSet;
+import co.cask.cdap.messaging.MessagingService;
+import co.cask.cdap.messaging.client.ClientMessagingService;
+import com.google.inject.AbstractModule;
+import com.google.inject.Scopes;
 
 /**
- * Test for {@link PreviewHttpHandler}.
+ * The Guice module to provide binding for messaging system client.
+ * This module should only be used in containers in distributed mode.
  */
-public class PreviewHttpHandlerTest extends AppFabricTestBase {
+public class MessagingClientModule extends AbstractModule {
 
-  @Test
-  public void testInjector() throws Exception {
-    PreviewHttpHandler handler = getInjector().getInstance(PreviewHttpHandler.class);
-    handler.createPreviewInjector(new ApplicationId("ns", "app"), new HashSet<String>());
+  @Override
+  protected void configure() {
+    bind(MessagingService.class).to(ClientMessagingService.class).in(Scopes.SINGLETON);
   }
 }

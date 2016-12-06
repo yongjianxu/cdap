@@ -16,6 +16,7 @@
 
 package co.cask.cdap.operations.yarn;
 
+import co.cask.cdap.common.utils.Tasks;
 import co.cask.cdap.operations.OperationalStats;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -28,6 +29,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests {@link OperationalStats} for Yarn.
@@ -40,6 +43,8 @@ public abstract class AbstractYarnOperationalStatsTest {
   private Configuration conf;
 
   protected abstract MiniYARNCluster createYarnCluster() throws IOException, InterruptedException, YarnException;
+
+  protected abstract int getNumNodes();
 
   @Before
   public void setup() throws Exception {
@@ -56,7 +61,7 @@ public abstract class AbstractYarnOperationalStatsTest {
   }
 
   @Test
-  public void test() throws IOException {
+  public void test() throws Exception {
     YarnInfo info = new YarnInfo(conf);
     Assert.assertEquals("YARN", info.getServiceName());
     Assert.assertEquals("info", info.getStatType());
@@ -79,11 +84,17 @@ public abstract class AbstractYarnOperationalStatsTest {
     Assert.assertEquals(0, apps.getRunning());
     Assert.assertEquals(0, apps.getSubmitted());
     Assert.assertEquals(0, apps.getTotal());
-    YarnResources resources = new YarnResources(conf);
+    final YarnResources resources = new YarnResources(conf);
     Assert.assertEquals("YARN", resources.getServiceName());
     Assert.assertEquals("resources", resources.getStatType());
-    resources.collect();
-    Assert.assertTrue(resources.getTotalMemory() > 0);
+    // wait until node manager reports are available
+    Tasks.waitFor(true, new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        resources.collect();
+        return resources.getTotalMemory() > 0;
+      }
+    }, 10, TimeUnit.SECONDS);
     Assert.assertEquals(0, resources.getUsedMemory());
     Assert.assertEquals(resources.getTotalMemory(), resources.getFreeMemory());
     Assert.assertTrue(resources.getTotalVCores() > 0);
@@ -111,8 +122,8 @@ public abstract class AbstractYarnOperationalStatsTest {
     Assert.assertEquals(0, nodes.getNewContainers());
     Assert.assertEquals(0, nodes.getUnusableContainers());
     nodes.collect();
-    Assert.assertEquals(2, nodes.getTotalNodes());
-    Assert.assertEquals(2, nodes.getHealthyNodes());
+    Assert.assertEquals(getNumNodes(), nodes.getTotalNodes());
+    Assert.assertEquals(getNumNodes(), nodes.getHealthyNodes());
     Assert.assertEquals(0, nodes.getNewNodes());
     Assert.assertEquals(0, nodes.getUnusableNodes());
     Assert.assertEquals(0, nodes.getTotalContainers());
