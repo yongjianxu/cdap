@@ -186,8 +186,8 @@ function build_javadocs() {
   fi
   local start=`date`
   cd ${PROJECT_PATH}
-  MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" # match other CDAP builds
-  mvn clean install ${javadoc_run} -P examples,templates,release -DskipTests -Dgpg.skip=true -DisOffline=false ${debug_flag}
+  MAVEN_OPTS="-Xmx4g -XX:MaxPermSize=256m" mvn clean install -P examples,templates,release -DskipTests -Dgpg.skip=true && mvn ${javadoc_run} -DskipTests -DisOffline=false ${debug_flag}
+
   warnings=$?
   if [[ ${warnings} -eq 0 ]]; then
     echo
