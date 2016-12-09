@@ -186,7 +186,7 @@ function build_javadocs() {
   fi
   local start=`date`
   cd ${PROJECT_PATH}
-  MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=128m" mvn clean install -P examples,templates,release -DskipTests -Dgpg.skip=true && mvn ${javadoc_run} -DskipTests -P templates -DisOffline=false ${debug_flag}
+  MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=256m" mvn clean install -P examples,templates,release -DskipTests -Dgpg.skip=true && mvn ${javadoc_run} -DskipTests -P templates -DisOffline=false ${debug_flag}
   warnings=$?
   if [[ ${warnings} -eq 0 ]]; then
     echo
