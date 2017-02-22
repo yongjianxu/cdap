@@ -223,7 +223,66 @@ function pipelines_download_includes() {
   # Uses: $BASE_TARGET  $CDAP_PIPELINES_SOURCE
   # Parameter      1                 2                         3 (optional)  4 (optional)  5 (optional)
   # Definition     source_dir        source_file_name          append_file   target_file   target_dir
+
+  download_md_file cassandra-plugins Cassandra-batchsink.md
+
+  download_md_file wrangler-transform
+  download_md_file realtime-stream-source
+  download_md_file hashing-tf-feature-generator
+  download_md_file naive-bayes-analytics
+  download_md_file logistic-regression-analytics
+
+  download_md_file skipgram-analytics
+  download_md_file tokenizer-analytics
+}
+
+function pipelines_download_includes_original() {
+  echo_red_bold "Checking Plugin Archetypes"
+  local cdap_app_templates="cdap-app-templates/cdap-etl/cdap-etl-archetypes/cdap-data-pipeline-plugins-archetype/src/main/resources/archetype-resources/src/main/java"
   
+  test_an_include 88ef4c43707322f700ccd7a1b445100f ../../${cdap_app_templates}/FilesetMoveAction.java
+  test_an_include 83c6e8e47dff67a8fd5d744ac81f4ee3 ../../${cdap_app_templates}/FilesetDeletePostAction.java
+  test_an_include 4b1ec5f3df66e8242bffe5ca13d55668 ../../${cdap_app_templates}/TextFileSetSource.java
+  test_an_include 26cb2a53c3ec41ec81591d381b5fa758 ../../${cdap_app_templates}/TextFileSetSink.java
+  test_an_include 00778d7ba7bfb16c9ad97fac20b6d327 ../../${cdap_app_templates}/WordCountAggregator.java
+  test_an_include 3fba43f907e701b1bb72efad2496d7b6 ../../${cdap_app_templates}/WordCountCompute.java
+  test_an_include 9f4d179eb127337e352f2b0a814b57b0 ../../${cdap_app_templates}/WordCountSink.java
+  test_an_include 54e652348b15068b7de10e3f05fde1e5 ../../${cdap_app_templates}/StringCaseTransform.java
+
+  echo_red_bold "Checking CDAP Pipeline Plugin Documentation"
+  local pipelines_plugins="hydrator-plugins"
+  local plugins="plugins"
+  local current_directory=$(pwd)
+
+  set_version
+
+  if [ "x${LOCAL_INCLUDES}" == "x${TRUE}" ]; then
+    echo_red_bold "Copying local copies of Markdown doc file includes..."
+    local base_source="file://${PROJECT_PATH}/../${pipelines_plugins}"
+    CDAP_PIPELINES_SOURCE="${base_source}"
+  else
+    echo_red_bold "Downloading Markdown doc file includes from GitHub repo caskdata/${pipelines_plugins}..."
+    local base_source="https://raw.githubusercontent.com/caskdata/${pipelines_plugins}"
+    if [ "x${GIT_BRANCH_TYPE:0:7}" == "xdevelop" ]; then
+      local pipelines_branch="develop"
+    else
+      local pipelines_branch="${GIT_BRANCH_CASK_CDAP_PIPELINES}"
+    fi
+    CDAP_PIPELINES_SOURCE="${base_source}/${pipelines_branch}"
+  fi
+
+  # Copy the source _includes files so they can be populated with the markdown files
+  BASE_TARGET="${1}/${plugins}"
+  cp -R "${SCRIPT_PATH}/source/_includes/${plugins}" "${1}"
+#   cp -R "${SCRIPT_PATH}/source/pipelines/_includes/${plugins}" "${1}"
+  
+  echo_red_bold "Using ${CDAP_PIPELINES_SOURCE}"
+  get_pipelines_version ${BASE_TARGET} ${CDAP_PIPELINES_SOURCE}
+  
+  # Uses: $BASE_TARGET  $CDAP_PIPELINES_SOURCE
+  # Parameter      1                 2                         3 (optional)  4 (optional)  5 (optional)
+  # Definition     source_dir        source_file_name          append_file   target_file   target_dir
+
   download_md_file cassandra-plugins Cassandra-batchsink.md
   download_md_file cassandra-plugins Cassandra-batchsource.md 
   download_md_file cassandra-plugins Cassandra-realtimesink.md 
