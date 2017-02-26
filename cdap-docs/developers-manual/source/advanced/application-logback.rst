@@ -35,12 +35,10 @@ CDAP comes packaged with the CDAP ``LogAppender`` class which is used by CDAP fo
 processing logs from the CDAP system and user namespaces. It also has a
 ``RollingLocationLogAppender``, an extension of `Logback <http://logback.qos.ch/>`__\ 's
 ``RollingFileAppender`` that uses HDFS.
-
-More information implementing a custom appender can be found here <link>.
  
-Once you have the appender packaged, copy the appender JAR to the path denoted by property
-``log.process.pipeline.lib.dir`` in your cluster's ``cdap-site.xml`` file in order to make
-it available. 
+Once you have the appender packaged, to make it available, copy the appender JAR to the
+path set by the property ``log.process.pipeline.lib.dir`` in your cluster's
+``cdap-site.xml`` file. 
 
 When the ``log.saver`` system container starts up, any JARs under that directory will be
 made available to it.
@@ -61,7 +59,6 @@ for persisting and retrieving of metadata (such as Kafka offsets).
 They have separate Kafka consumers, as this allows each pipeline to have different offsets
 and a slow processing pipeline won't affect the performance of faster logging pipelines.
 
-
 Example Logging pipeline configuration used by CDAP system logging -
 <https://github.com/caskdata/cdap/blob/release/4.1/cdap-watchdog/src/main/resources/cdap-
 log-pipeline.xml>
@@ -70,15 +67,14 @@ Example Custom Logging pipeline configuration using RollingLocationLogAppender -
 https://github.com/caskdata/cdap/blob/release/4.1/cdap-watchdog/src/test/resources/rolling
 -appender-logback-test.xml 
 
-TODO : find a better example for this.
 
 To create a custom logging pipeline, you would create and configure a
-``logback.xml`` file, configuring loggers and appenders based on your requirement and place
-this logback file at the path identified by ``log.process.pipeline.config.dir``.
+``logback.xml`` file, configuring loggers and appenders based on your requirements, and place
+the logback file at the path identified by ``log.process.pipeline.config.dir``.
 
 
 Pipeline Properties
-
+-------------------
 CDAP Pipeline has certain common properties for the pipelines that can be configured in
 cdap-site.xml. They are 
 
@@ -91,12 +87,13 @@ log.process.pipeline.logger.cache.size
 log.process.pipeline.logger.cache.expiration.ms
 log.process.pipeline.auto.buffer.ratio
 
-Default Values for these can be found in cdap-default.xml. 
+Default Values for these are documented in the :ref:`cdap-site.xml <appendix-cdap-site.xml>`. 
 
 These properties can also be changed at pipeline level, by overriding these properties by
 providing a value in the pipeline's logback.xml file for these properties.
 
-Implementing a custom Appender
+Implementing a Custom Appender
+------------------------------
 
 Users can use any existing logback's appender and also `RollingLocationLogAppender` -
 Extension of RollingFileLogAppender to use HDFS location in their logging pipelines. In
