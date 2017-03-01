@@ -78,16 +78,28 @@ Pipeline Properties
 CDAP Pipeline has certain common properties for the pipelines that can be configured in
 cdap-site.xml. They are 
 
-Properties
+Properties (add commentary to the admin manual) (order of these does not match XML)
+
+log.pipeline.cdap.dir.permissions
+log.pipeline.cdap.file.cleanup.interval.mins
+log.pipeline.cdap.file.cleanup.transaction.timeout
+log.pipeline.cdap.file.max.lifetime.ms
+log.pipeline.cdap.file.max.size.bytes
+log.pipeline.cdap.file.permissions
+log.pipeline.cdap.file.retention.duration.days
+log.pipeline.cdap.file.sync.interval.bytes
+log.process.pipeline.auto.buffer.ratio
 log.process.pipeline.buffer.size
 log.process.pipeline.checkpoint.interval.ms
+log.process.pipeline.config.dir
 log.process.pipeline.event.delay.ms
 log.process.pipeline.kafka.fetch.size
-log.process.pipeline.logger.cache.size
+log.process.pipeline.lib.dir
 log.process.pipeline.logger.cache.expiration.ms
-log.process.pipeline.auto.buffer.ratio
+log.process.pipeline.logger.cache.size
+log.publish.partition.key
 
-Default Values for these are documented in the :ref:`cdap-site.xml <appendix-cdap-site.xml>`. 
+Default Values for these are documented in the :ref:`cdap-default.xml <appendix-cdap-site.xml>`. 
 
 These properties can also be changed at pipeline level, by overriding these properties by
 providing a value in the pipeline's logback.xml file for these properties.
