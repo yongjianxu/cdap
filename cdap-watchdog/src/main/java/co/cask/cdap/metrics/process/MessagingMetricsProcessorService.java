@@ -85,6 +85,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
   private final MetricStore metricStore;
   private final Map<String, String> metricsContextMap;
   private final int fetcherLimit;
+  private final int persistThreshold;
   private final ConcurrentLinkedDeque<MetricValues> records;
   private final ConcurrentMap<TopicIdMetaKey, byte[]> topicMessageIds;
   private final AtomicBoolean persistingFlag;
@@ -105,10 +106,11 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
                                           DatumReaderFactory readerFactory,
                                           MetricStore metricStore,
                                           @Named(Constants.Metrics.MESSAGING_FETCHER_LIMIT) int fetcherLimit,
+                                          @Named(Constants.Metrics.MESSAGING_FETCHER_LIMIT) int persistThreshold,
                                           @Assisted Set<Integer> topicNumbers,
                                           @Assisted MetricsContext metricsContext) {
     this(metricDatasetFactory, topicPrefix, messagingService,
-         schemaGenerator, readerFactory, metricStore, fetcherLimit, topicNumbers, metricsContext, 1000);
+         schemaGenerator, readerFactory, metricStore, fetcherLimit, persistThreshold, topicNumbers, metricsContext, 1000);
   }
 
   @VisibleForTesting
@@ -119,6 +121,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
                                    DatumReaderFactory readerFactory,
                                    MetricStore metricStore,
                                    int fetcherLimit,
+                                   int persistThreshold,
                                    Set<Integer> topicNumbers,
                                    MetricsContext metricsContext,
                                    int metricsProcessIntervalMillis) {
@@ -138,6 +141,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     this.metricStore = metricStore;
     this.metricStore.setMetricsContext(metricsContext);
     this.fetcherLimit = fetcherLimit;
+    this.persistThreshold = persistThreshold;
     this.metricsContextMap = metricsContext.getTags();
     this.processMetricsThreads = new ArrayList<>();
     this.records = new ConcurrentLinkedDeque<>();
@@ -332,9 +336,8 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
         try {
           Deque<MetricValues> recordsCopy = new LinkedList<>();
           Map<TopicIdMetaKey, byte[]> topicMessageIdsCopy = new HashMap<>(topicMessageIds);
-          // TODO: (CDAP-8327) there is a risk of running out-of-memory if other threads keep writing to records
           Iterator<MetricValues> iterator = records.iterator();
-          while (iterator.hasNext()) {
+          while (iterator.hasNext() && recordsCopy.size() < persistThreshold) {
             recordsCopy.add(iterator.next());
             iterator.remove();
           }

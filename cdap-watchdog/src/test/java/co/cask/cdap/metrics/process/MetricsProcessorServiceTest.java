@@ -129,7 +129,7 @@ public class MetricsProcessorServiceTest extends MetricsProcessorServiceTestBase
       new MessagingMetricsProcessorService(injector.getInstance(MetricDatasetFactory.class), TOPIC_PREFIX,
                                            messagingService, injector.getInstance(SchemaGenerator.class),
                                            injector.getInstance(DatumReaderFactory.class),
-                                           metricStore, 1, partitions, new NoopMetricsContext(), 50);
+                                           metricStore, 1, 100, partitions, new NoopMetricsContext(), 50);
     messagingMetricsProcessorService.startAndWait();
 
     // Publish metrics with messaging service and record expected metrics
@@ -146,7 +146,7 @@ public class MetricsProcessorServiceTest extends MetricsProcessorServiceTestBase
       new MessagingMetricsProcessorService(injector.getInstance(MetricDatasetFactory.class), TOPIC_PREFIX,
                                            messagingService, injector.getInstance(SchemaGenerator.class),
                                            injector.getInstance(DatumReaderFactory.class),
-                                           metricStore, 100, partitions, new NoopMetricsContext(), 50);
+                                           metricStore, 100, 1000, partitions, new NoopMetricsContext(), 50);
     messagingMetricsProcessorService.startAndWait();
 
     // Publish metrics after MessagingMetricsProcessorService restarts and record expected metrics

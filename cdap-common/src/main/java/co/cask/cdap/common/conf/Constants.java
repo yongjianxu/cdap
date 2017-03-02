@@ -542,6 +542,8 @@ public final class Constants {
 
     public static final String MESSAGING_TOPIC_NUM = "metrics.messaging.topic.num";
     public static final String MESSAGING_FETCHER_LIMIT = "metrics.messaging.fetcher.limit";
+    public static final String MESSAGING_PERSIST_THRESHOLD = "metrics.messaging.persist.threshold";
+
 
     public static final Map<String, String> METRICS_PROCESSOR_CONTEXT =
       ImmutableMap.of(Constants.Metrics.Tag.NAMESPACE, NamespaceId.SYSTEM.getNamespace(),
