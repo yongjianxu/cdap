@@ -106,11 +106,11 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
                                           DatumReaderFactory readerFactory,
                                           MetricStore metricStore,
                                           @Named(Constants.Metrics.MESSAGING_FETCHER_LIMIT) int fetcherLimit,
-                                          @Named(Constants.Metrics.MESSAGING_FETCHER_LIMIT) int persistThreshold,
+                                          @Named(Constants.Metrics.MESSAGING_PERSIST_THRESHOLD) int persistThreshold,
                                           @Assisted Set<Integer> topicNumbers,
                                           @Assisted MetricsContext metricsContext) {
-    this(metricDatasetFactory, topicPrefix, messagingService,
-         schemaGenerator, readerFactory, metricStore, fetcherLimit, persistThreshold, topicNumbers, metricsContext, 1000);
+    this(metricDatasetFactory, topicPrefix, messagingService, schemaGenerator, readerFactory, metricStore,
+         fetcherLimit, persistThreshold, topicNumbers, metricsContext, 1000);
   }
 
   @VisibleForTesting
@@ -285,7 +285,12 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     }
 
     private void processMetrics() {
-      // Decode the metrics records.
+      // If the size of records exceeds the threshold, stop fetching for new messages and adding new records.
+      // Return to sleep for metricsProcessIntervalMillis to wait for metrics values to be persisted and
+      // removed from records.
+      if (records.size() > persistThreshold) {
+        return;
+      }
       try {
         MessageFetcher fetcher = messagingService.prepareFetch(topicIdMetaKey.getTopicId());
         fetcher.setLimit(fetcherLimit);
