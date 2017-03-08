@@ -541,8 +541,7 @@ public final class Constants {
     public static final int DEFAULT_KAFKA_CONSUMER_PERSIST_THRESHOLD = 100;
 
     public static final String MESSAGING_TOPIC_NUM = "metrics.messaging.topic.num";
-    public static final String MESSAGING_FETCHER_LIMIT = "metrics.messaging.fetcher.limit";
-    public static final String MESSAGING_PERSIST_THRESHOLD = "metrics.messaging.persist.threshold";
+    public static final String MESSAGING_QUEUE_SIZE = "metrics.messaging.queue.size";
 
 
     public static final Map<String, String> METRICS_PROCESSOR_CONTEXT =

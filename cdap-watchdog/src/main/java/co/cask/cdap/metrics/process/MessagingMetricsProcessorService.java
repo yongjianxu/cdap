@@ -55,6 +55,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -62,6 +63,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentMap;
@@ -85,8 +89,8 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
   private final MetricStore metricStore;
   private final Map<String, String> metricsContextMap;
   private final int fetcherLimit;
-  private final int persistThreshold;
-  private final ConcurrentLinkedDeque<MetricValues> records;
+  private final int queueSize;
+  private final BlockingQueue<MetricValues> records;
   private final ConcurrentMap<TopicIdMetaKey, byte[]> topicMessageIds;
   private final AtomicBoolean persistingFlag;
   private final int metricsProcessIntervalMillis;
@@ -105,12 +109,11 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
                                           SchemaGenerator schemaGenerator,
                                           DatumReaderFactory readerFactory,
                                           MetricStore metricStore,
-                                          @Named(Constants.Metrics.MESSAGING_FETCHER_LIMIT) int fetcherLimit,
-                                          @Named(Constants.Metrics.MESSAGING_PERSIST_THRESHOLD) int persistThreshold,
+                                          @Named(Constants.Metrics.MESSAGING_QUEUE_SIZE) int queueSize,
                                           @Assisted Set<Integer> topicNumbers,
                                           @Assisted MetricsContext metricsContext) {
     this(metricDatasetFactory, topicPrefix, messagingService, schemaGenerator, readerFactory, metricStore,
-         fetcherLimit, persistThreshold, topicNumbers, metricsContext, 1000);
+         queueSize, topicNumbers, metricsContext, 1000);
   }
 
   @VisibleForTesting
@@ -120,8 +123,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
                                    SchemaGenerator schemaGenerator,
                                    DatumReaderFactory readerFactory,
                                    MetricStore metricStore,
-                                   int fetcherLimit,
-                                   int persistThreshold,
+                                   int queueSize,
                                    Set<Integer> topicNumbers,
                                    MetricsContext metricsContext,
                                    int metricsProcessIntervalMillis) {
@@ -140,11 +142,11 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     }
     this.metricStore = metricStore;
     this.metricStore.setMetricsContext(metricsContext);
-    this.fetcherLimit = fetcherLimit;
-    this.persistThreshold = persistThreshold;
+    this.fetcherLimit = queueSize / topicNumbers.size();
+    this.queueSize = queueSize;
     this.metricsContextMap = metricsContext.getTags();
     this.processMetricsThreads = new ArrayList<>();
-    this.records = new ConcurrentLinkedDeque<>();
+    this.records = new ArrayBlockingQueue<>(queueSize);
     this.topicMessageIds = new ConcurrentHashMap<>();
     this.persistingFlag = new AtomicBoolean();
     this.metricsProcessIntervalMillis = metricsProcessIntervalMillis;
@@ -225,7 +227,8 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     LOG.info("Metrics Processing Service stopped.");
   }
 
-  private void persistRecordsMessageIds(Deque<MetricValues> metricValues, Map<TopicIdMetaKey, byte[]> messageIds) {
+  private void persistRecordsMessageIds(Deque<MetricValues> metricValues,
+                                        Map<TopicIdMetaKey, byte[]> messageIds) {
     try {
       if (!metricValues.isEmpty()) {
         persistRecords(metricValues);
@@ -288,7 +291,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
       // If the size of records exceeds the threshold, stop fetching for new messages and adding new records.
       // Return to sleep for metricsProcessIntervalMillis to wait for metrics values to be persisted and
       // removed from records.
-      if (records.size() > persistThreshold) {
+      if (records.size() > queueSize) {
         return;
       }
       try {
@@ -312,7 +315,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
             try {
               payloadInput.reset(input.getPayload());
               MetricValues metricValues = recordReader.read(decoder, recordSchema);
-              records.add(metricValues);
+              records.put(metricValues);
               currentMessageId = input.getId();
               if (LOG.isTraceEnabled()) {
                 LOG.trace("Received message {} with metrics: {}", Bytes.toStringBinary(currentMessageId), metricValues);
@@ -342,7 +345,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
           Deque<MetricValues> recordsCopy = new LinkedList<>();
           Map<TopicIdMetaKey, byte[]> topicMessageIdsCopy = new HashMap<>(topicMessageIds);
           Iterator<MetricValues> iterator = records.iterator();
-          while (iterator.hasNext() && recordsCopy.size() < persistThreshold) {
+          while (iterator.hasNext() && recordsCopy.size() < queueSize) {
             recordsCopy.add(iterator.next());
             iterator.remove();
           }
