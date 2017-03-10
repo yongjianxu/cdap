@@ -55,19 +55,18 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -92,7 +91,9 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
   private final int queueSize;
   private final BlockingQueue<MetricValues> records;
   private final ConcurrentMap<TopicIdMetaKey, byte[]> topicMessageIds;
+  private final ConcurrentMap<TopicIdMetaKey, Long> topicLatestTime;
   private final AtomicBoolean persistingFlag;
+  // maximum number of milliseconds to sleep between each run of fetching & processing new metrics
   private final int metricsProcessIntervalMillis;
   private final List<ProcessMetricsThread> processMetricsThreads;
 
@@ -142,12 +143,13 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     }
     this.metricStore = metricStore;
     this.metricStore.setMetricsContext(metricsContext);
-    this.fetcherLimit = queueSize / topicNumbers.size();
+    this.fetcherLimit = Math.max(1, queueSize / topicNumbers.size()); // fetcherLimit is at least one
     this.queueSize = queueSize;
     this.metricsContextMap = metricsContext.getTags();
     this.processMetricsThreads = new ArrayList<>();
     this.records = new ArrayBlockingQueue<>(queueSize);
     this.topicMessageIds = new ConcurrentHashMap<>();
+    this.topicLatestTime = new ConcurrentHashMap<>();
     this.persistingFlag = new AtomicBoolean();
     this.metricsProcessIntervalMillis = metricsProcessIntervalMillis;
   }
@@ -227,7 +229,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     LOG.info("Metrics Processing Service stopped.");
   }
 
-  private void persistRecordsMessageIds(Deque<MetricValues> metricValues,
+  private void persistRecordsMessageIds(Queue<MetricValues> metricValues,
                                         Map<TopicIdMetaKey, byte[]> messageIds) {
     try {
       if (!metricValues.isEmpty()) {
@@ -243,9 +245,9 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     }
   }
 
-  private void persistRecords(Deque<MetricValues> metricValues) throws Exception {
+  private void persistRecords(Queue<MetricValues> metricValues) throws Exception {
     long now = System.currentTimeMillis();
-    long lastRecordTime = metricValues.getLast().getTimestamp();
+    long lastRecordTime = Collections.max(topicLatestTime.values());
     long delay = now - TimeUnit.SECONDS.toMillis(lastRecordTime);
     metricValues.add(
       new MetricValues(metricsContextMap, TimeUnit.MILLISECONDS.toSeconds(now), ImmutableList.of(
@@ -262,6 +264,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     private final TopicIdMetaKey topicIdMetaKey;
     private final PayloadInputStream payloadInput;
     private final BinaryDecoder decoder;
+    private long previousSleepMillis;
 
     ProcessMetricsThread(TopicIdMetaKey topicIdMetaKey, @Nullable byte[] messageId) {
       super(String.format("ProcessMetricsThread-%s", topicIdMetaKey.getTopicId()));
@@ -272,14 +275,19 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
       this.topicIdMetaKey = topicIdMetaKey;
       this.payloadInput = new PayloadInputStream();
       this.decoder = new BinaryDecoder(payloadInput);
+      this.previousSleepMillis = metricsProcessIntervalMillis;
     }
 
     @Override
     public void run() {
       while (isRunning()) {
         try {
-          processMetrics();
-          TimeUnit.MILLISECONDS.sleep(metricsProcessIntervalMillis);
+          long sleepTime = processMetrics();
+          // Don't sleep if sleepTime returned is 0
+          if (sleepTime > 0) {
+            TimeUnit.MILLISECONDS.sleep(sleepTime);
+            previousSleepMillis = sleepTime;
+          }
         } catch (InterruptedException e) {
           // It's triggered by stop
           Thread.currentThread().interrupt();
@@ -287,13 +295,18 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
       }
     }
 
-    private void processMetrics() {
-      // If the size of records exceeds the threshold, stop fetching for new messages and adding new records.
-      // Return to sleep for metricsProcessIntervalMillis to wait for metrics values to be persisted and
-      // removed from records.
-      if (records.size() > queueSize) {
-        return;
-      }
+    /**
+     * Fetch at most {@code fetcherLimit} metrics to process, and calculate the estimated sleep time
+     * before the next run with the best effort to avoid accumulating unprocessed metrics
+     *
+     * @return Estimated sleep time which guarantees that at current speed of emitting new metrics,
+     *         the number of metrics to be processed in the next run will not exceed {@code this.fetcherLimit},
+     *         or metrics to be persisted in the next run will not exceed {@code queueSize}.
+     *         Return {@code 0} if no sleep to catch-up with new metrics
+     *         at best effort
+     */
+    private long processMetrics() {
+      long startTime = System.currentTimeMillis();
       try {
         MessageFetcher fetcher = messagingService.prepareFetch(topicIdMetaKey.getTopicId());
         fetcher.setLimit(fetcherLimit);
@@ -309,6 +322,8 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
         }
 
         byte[] currentMessageId = null;
+        int newMetricsCount = 0;
+        long firstMetricTime = 0;
         try (CloseableIterator<RawMessage> iterator = fetcher.fetch()) {
           while (iterator.hasNext() && isRunning()) {
             RawMessage input = iterator.next();
@@ -316,6 +331,11 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
               payloadInput.reset(input.getPayload());
               MetricValues metricValues = recordReader.read(decoder, recordSchema);
               records.put(metricValues);
+              if (newMetricsCount == 0) {
+                firstMetricTime = metricValues.getTimestamp();
+              }
+              newMetricsCount++;
+              topicLatestTime.put(topicIdMetaKey, metricValues.getTimestamp());
               currentMessageId = input.getId();
               if (LOG.isTraceEnabled()) {
                 LOG.trace("Received message {} with metrics: {}", Bytes.toStringBinary(currentMessageId), metricValues);
@@ -332,17 +352,31 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
 
         // Skip persisting if the records is empty
         if (records.isEmpty()) {
-          return;
+          return metricsProcessIntervalMillis; // Sleep for maximum time allowed if no new metrics are received
         }
 
         // Ensure there's only one thread can persist records and messageId's when the persistingFlag is false.
         // The thread set persistingFlag to true when it starts to persist.
         if (!persistingFlag.compareAndSet(false, true)) {
           LOG.trace("Cannot persist because persistingFlag is taken by another thread.");
-          return;
+          // Calculating the length of time used to emit the metrics fetched in current run.
+          // If the number of newly fetched metrics is smaller than fetcherLimit, use the sleep time after previous run.
+          // If the number of newly fetched metrics is equal to fetcherLimit, there might be more than fetcherLimit
+          // emitted during the last sleep time. Use the difference between the time of first and last metrics
+          // fetched instead.
+          long metricsEmittingTime = newMetricsCount < fetcherLimit ?
+            previousSleepMillis : topicLatestTime.get(topicIdMetaKey) - firstMetricTime;
+          // Estimate number of metrics emitted to current topic per millisecond
+          double metricsEmittingSpeed = newMetricsCount / metricsEmittingTime;
+          // Calculate the time to emit fetcherLimit new metrics at current emitting speed
+          long timeToReachFetcherLimit = (long) (fetcherLimit / metricsEmittingSpeed);
+          long timeSpent = System.currentTimeMillis() - startTime;
+          // Return time to sleep within range [0, metricsProcessIntervalMillis]
+          return Math.min(Math.max(0, timeToReachFetcherLimit - timeSpent), metricsProcessIntervalMillis);
         }
+        Deque<MetricValues> recordsCopy = new LinkedList<>();
         try {
-          Deque<MetricValues> recordsCopy = new LinkedList<>();
+          recordsCopy = new LinkedList<>();
           Map<TopicIdMetaKey, byte[]> topicMessageIdsCopy = new HashMap<>(topicMessageIds);
           Iterator<MetricValues> iterator = records.iterator();
           while (iterator.hasNext() && recordsCopy.size() < queueSize) {
@@ -356,9 +390,23 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
           // Set persistingFlag back to false after persisting completes.
           persistingFlag.set(false);
         }
+        if (recordsCopy.size() == 0) {
+          // Should never reach here;
+          return metricsProcessIntervalMillis;
+        }
+        // Calculating the length of time used to emit the metrics to be persisted.
+        long metricsEmittingTime = recordsCopy.peekLast().getTimestamp() - recordsCopy.peekFirst().getTimestamp();
+        // Estimate number of metrics emitted to be persisted per millisecond
+        double metricsEmittingSpeed = newMetricsCount / metricsEmittingTime;
+        // Calculate the time to emit queueSize new metrics at current emitting speed
+        long timeToReachFetcherLimit = (long) (queueSize / metricsEmittingSpeed);
+        long timeSpent = System.currentTimeMillis() - startTime;
+        // Return time to sleep within range [0, metricsProcessIntervalMillis]
+        return Math.min(Math.max(0, timeToReachFetcherLimit - timeSpent), metricsProcessIntervalMillis);
       } catch (Exception e) {
         LOG.warn("Failed to process metrics. Will be retried in next iteration.", e);
       }
+      return metricsProcessIntervalMillis;
     }
   }
 
