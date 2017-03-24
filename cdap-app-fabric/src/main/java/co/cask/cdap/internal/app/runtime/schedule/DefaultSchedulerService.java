@@ -48,7 +48,7 @@ public class DefaultSchedulerService {
   /**
    * Handler that gets called by quartz to execute a scheduled job.
    */
-  static final class ScheduledJob implements Job {
+  public static final class ScheduledJob implements Job {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledJob.class);
     private final ScheduleTaskRunner taskRunner;

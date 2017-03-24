@@ -218,10 +218,19 @@ public class DatasetBasedStreamSizeScheduleStore {
       .execute(new TransactionExecutor.Subroutine() {
         @Override
         public void apply() throws Exception {
-          byte[] rowKey = Bytes.toBytes(String.format("%s:%s", KEY_PREFIX,
-                                                      AbstractSchedulerService.scheduleIdFor(programId, programType,
-                                                                                             scheduleName)));
-          table.delete(rowKey);
+          String rowKey = String.format("%s:%s", KEY_PREFIX, AbstractSchedulerService.scheduleIdFor(
+            programId, programType, scheduleName));
+
+          String versionLessRowKey = AbstractSchedulerService.removeAppVersion(rowKey);
+          if (versionLessRowKey != null) {
+            byte[] versionLessRowKeyBytes = Bytes.toBytes(versionLessRowKey);
+            Row versionLessRow = table.get(versionLessRowKeyBytes);
+            if (!versionLessRow.isEmpty()) {
+              table.delete(versionLessRowKeyBytes);
+            }
+          }
+
+          table.delete(Bytes.toBytes(rowKey));
         }
       });
   }
@@ -245,20 +254,25 @@ public class DatasetBasedStreamSizeScheduleStore {
               byte[] lastRunTsBytes = row.get(LAST_RUN_TS_COL);
               byte[] activeBytes = row.get(ACTIVE_COL);
               byte[] propertyBytes = row.get(PROPERTIES_COL);
-              if (scheduleBytes == null || baseSizeBytes == null || baseTsBytes == null || lastRunSizeBytes == null ||
-                lastRunTsBytes == null || activeBytes == null) {
+              if (isInvalidRow(row)) {
                 continue;
               }
 
               String rowKey = Bytes.toString(row.getRow());
               String[] splits = rowKey.split(":");
-              // Row key for the trigger should be of the form -
-              // streamSizeSchedule:namespace:application:version:type:program:schedule
-              if (splits.length != 7) {
+              ProgramId program;
+
+              if (splits.length == 7) {
+                // New Row key for the trigger should be of the form -
+                // streamSizeSchedule:namespace:application:version:type:program:schedule
+                program = new ApplicationId(splits[1], splits[2], splits[3])
+                  .program(ProgramType.valueOf(splits[4]), splits[5]);
+              } else if (splits.length == 6) {
+                program = new ApplicationId(splits[1], splits[2]).program(ProgramType.valueOf(splits[3]), splits[4]);
+              } else {
                 continue;
               }
-              ProgramId program = new ApplicationId(splits[1], splits[2], splits[3])
-                .program(ProgramType.valueOf(splits[4]), splits[5]);
+
               SchedulableProgramType programType = SchedulableProgramType.valueOf(splits[4]);
 
               StreamSizeSchedule schedule = GSON.fromJson(Bytes.toString(scheduleBytes), StreamSizeSchedule.class);

@@ -26,6 +26,7 @@ import co.cask.cdap.api.dataset.table.Scanner;
 import co.cask.cdap.api.dataset.table.Table;
 import co.cask.cdap.common.utils.ImmutablePair;
 import co.cask.cdap.proto.ProgramType;
+import co.cask.cdap.proto.id.ApplicationId;
 import co.cask.cdap.proto.id.ProgramId;
 import co.cask.cdap.proto.id.ProgramRunId;
 import com.google.common.base.Function;
@@ -37,6 +38,7 @@ import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 
 import java.lang.reflect.Type;
+import java.nio.BufferUnderflowException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -340,6 +342,28 @@ public class MetadataStoreDataset extends AbstractDataset {
     return builder;
   }
 
+  protected MDSKey.Builder getVersionLessProgramKeyBuilder(String recordType, @Nullable ProgramId programId) {
+    MDSKey.Builder builder = new MDSKey.Builder().add(recordType);
+    if (programId != null) {
+      builder.add(programId.getNamespace());
+      builder.add(programId.getApplication());
+      builder.add(programId.getType().name());
+      builder.add(programId.getProgram());
+    }
+    return builder;
+  }
+
+  protected MDSKey.Builder getVersionLessProgramKeyBuilder(String recordType, @Nullable ProgramRunId programRunId) {
+    MDSKey.Builder builder = new MDSKey.Builder().add(recordType);
+    if (programRunId != null) {
+      builder.add(programRunId.getNamespace());
+      builder.add(programRunId.getApplication());
+      builder.add(programRunId.getType().name());
+      builder.add(programRunId.getProgram());
+    }
+    return builder;
+  }
+
   /**
    * Returns a ProgramId given the MDS key
    *
@@ -348,13 +372,33 @@ public class MetadataStoreDataset extends AbstractDataset {
    */
   protected ProgramId getProgramID(MDSKey key) {
     MDSKey.Splitter splitter = key.split();
-    splitter.getString(); // skip recordType
-    String namespace = splitter.getString(); // namespaceId
-    String application = splitter.getString(); // appId
-    splitter.getString(); // skip VersionId
-    String type = splitter.getString(); // type
-    String program = splitter.getString(); // program
-    return (new ProgramId(namespace, application, ProgramType.valueOf(type), program));
+    List<String> splits = new ArrayList<>();
+
+    try {
+      while (true) {
+        splits.add(splitter.getString());
+      }
+    } catch (BufferUnderflowException ex) {
+      // Expected
+    }
+
+    String namespace = splits.get(1);
+    String application = splits.get(2);
+    String appVersion;
+    String type;
+    String program;
+
+    // New Format
+    if (splits.size() >= 6) {
+      appVersion = splits.get(3);
+      type = splits.get(4);
+      program = splits.get(5);
+    } else {
+      appVersion = ApplicationId.DEFAULT_VERSION;
+      type = splits.get(3);
+      program = splits.get(4);
+    }
+    return (new ApplicationId(namespace, application, appVersion).program(ProgramType.valueOf(type), program));
   }
 
 }

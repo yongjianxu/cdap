@@ -181,9 +181,8 @@ public class AppMetadataStoreTest {
     final Set<ProgramRunId> programRunIdSet = new HashSet<>();
     final Set<ProgramRunId> programRunIdSetHalf = new HashSet<>();
     for (int i = 0; i < 100; ++i) {
-      ApplicationId application = NamespaceId.DEFAULT.app("app" + i);
-      final ProgramId program = application.program(ProgramType.values()[i % ProgramType.values().length],
-                                                    "program" + i);
+      ApplicationId application = NamespaceId.DEFAULT.app("app");
+      final ProgramId program = application.program(ProgramType.FLOW, "program");
       final RunId runId = RunIds.generate((i + 1) * 10000);
       expected.add(runId.toString());
       final int index = i;

@@ -630,7 +630,7 @@ public class DefaultStore implements Store {
       public void run(DatasetContext context) throws Exception {
         AppMetadataStore metaStore = getAppMetadataStore(context);
         metaStore.deleteApplication(id.getNamespace(), id.getApplication(), id.getVersion());
-        metaStore.deleteProgramHistory(id.getNamespace(), id.getApplication());
+        metaStore.deleteProgramHistory(id.getNamespace(), id.getApplication(), id.getVersion());
       }
     });
   }
