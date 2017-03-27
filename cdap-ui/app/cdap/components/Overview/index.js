@@ -115,7 +115,10 @@ export default class Overview extends Component {
       <div className={classnames("overview-container", {"show-overview": this.state.showOverview })}>
         <div className="overview-wrapper" >
           {
-            React.createElement(
+            isNil(this.state.tag) ?
+              null
+            :
+              React.createElement(
               Tag,
               {
                 entity: this.state.entity,
