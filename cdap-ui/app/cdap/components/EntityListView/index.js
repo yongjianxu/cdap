@@ -63,6 +63,7 @@ export default class EntityListView extends Component {
       showSplash: true,
       namespaceNotFound: false
     };
+    this.unmounted = false;
     this.eventEmitter = ee(ee);
     // Maintaining a retryCounter outside the state as it doesn't affect the state/view directly.
     // We just need to retry for 5 times exponentially and then stop with a message.
@@ -77,7 +78,7 @@ export default class EntityListView extends Component {
     MyUserStoreApi.get().subscribe((res) => {
       let userProperty = typeof res.property === 'object' ? res.property : {};
       let showSplash = userProperty['user-has-visited'] || false;
-      this.setState({
+      !this.unmounted && this.setState({
         userStoreObj : res,
         showSplash : showSplash
       });
@@ -89,7 +90,7 @@ export default class EntityListView extends Component {
     if (namespaces.length) {
       let selectedNamespace = NamespaceStore.getState().selectedNamespace;
       if (namespaces.indexOf(selectedNamespace) === -1) {
-        this.setState({
+        !this.unmounted && this.setState({
           namespaceNotFound: true
         });
       }
@@ -98,11 +99,11 @@ export default class EntityListView extends Component {
       let selectedNamespace = NamespaceStore.getState().selectedNamespace;
       let namespaces = NamespaceStore.getState().namespaces.map(ns => ns.name);
       if (namespaces.length && namespaces.indexOf(selectedNamespace) === -1) {
-        this.setState({
+        !this.unmounted && this.setState({
           namespaceNotFound: true
         });
       } else {
-        this.setState({
+        !this.unmounted && this.setState({
           namespaceNotFound: false
         });
       }
@@ -115,7 +116,7 @@ export default class EntityListView extends Component {
         total,
         overviewEntity,
       } = SearchStore.getState().search;
-      this.setState({
+      !this.unmounted && this.setState({
         entities,
         loading,
         limit,
@@ -194,6 +195,7 @@ export default class EntityListView extends Component {
     this.eventEmitter.off(globalEvents.STREAMCREATE, this.refreshSearchByCreationTime);
     this.eventEmitter.off(globalEvents.PUBLISHPIPELINE, this.refreshSearchByCreationTime);
     this.eventEmitter.off(globalEvents.ARTIFACTUPLOAD, this.refreshSearchByCreationTime);
+    this.unmounted = true;
   }
   refreshSearchByCreationTime() {
     let namespace = NamespaceStore.getState().selectedNamespace;
@@ -277,7 +279,7 @@ export default class EntityListView extends Component {
     search();
   }
   onOverviewCloseAndRefresh() {
-    this.setState({
+    !this.unmounted && this.setState({
       overview: false
     });
     SearchStore.dispatch({
@@ -286,7 +288,7 @@ export default class EntityListView extends Component {
     search();
   }
   dismissSplash() {
-    this.setState({
+    !this.unmounted && this.setState({
       showSplash: true
     });
     this.parseUrlAndUpdateStore();
@@ -301,7 +303,6 @@ export default class EntityListView extends Component {
     let offset = searchState.search.offset;
     let {statusCode:errorStatusCode, message:errorMessage } = searchState.search.error;
     let errorContent;
-
     if (!this.state.showSplash) {
       return (
         <WelcomeScreen
@@ -358,6 +359,7 @@ export default class EntityListView extends Component {
         );
       }
     }
+
 
     return (
       <div>
