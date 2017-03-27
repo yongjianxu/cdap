@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016 Cask Data, Inc.
+ * Copyright © 2017 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -13,24 +13,17 @@
  * License for the specific language governing permissions and limitations under
  * the License.
 */
-
 import Rx from 'rx';
-const MyUserStoreApi = {};
+const MyDatasetApi = {
+  __list: []
+};
 
-function setUserStore(__userStore) {
-  this.__userStore = __userStore;
-}
-
-MyUserStoreApi.get  = function() {
+MyDatasetApi.list = function() {
   let subject = new Rx.Subject();
   setTimeout(() => {
-    subject.onNext(this.__userStore);
+    subject.onNext(this.__list);
   });
   return subject;
 };
-MyUserStoreApi.set  = function() {
 
-};
-
-MyUserStoreApi.__setUserStore = setUserStore.bind(MyUserStoreApi);
-export default MyUserStoreApi;
+export {MyDatasetApi};

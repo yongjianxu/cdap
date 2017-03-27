@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016 Cask Data, Inc.
+ * Copyright © 2017 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -14,23 +14,22 @@
  * the License.
 */
 
-import Rx from 'rx';
-const MyUserStoreApi = {};
+/*
+  TODO: This is just a stub(mock) for jest to not invoke the actual socket connection.
+  This needs to be exported as a singleton class. Will do when we actually need to mock a function.
+*/
+const get = () => {};
+const status = () => {};
+const runs = () => {};
+const pollRuns = () => {};
+const pollStatus = () => {};
+const action = () => {};
 
-function setUserStore(__userStore) {
-  this.__userStore = __userStore;
-}
-
-MyUserStoreApi.get  = function() {
-  let subject = new Rx.Subject();
-  setTimeout(() => {
-    subject.onNext(this.__userStore);
-  });
-  return subject;
+export default {
+  get,
+  status,
+  runs,
+  pollRuns,
+  pollStatus,
+  action
 };
-MyUserStoreApi.set  = function() {
-
-};
-
-MyUserStoreApi.__setUserStore = setUserStore.bind(MyUserStoreApi);
-export default MyUserStoreApi;
