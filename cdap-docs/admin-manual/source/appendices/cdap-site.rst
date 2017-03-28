@@ -53,3 +53,6 @@ will be removed in a future release. Replacement properties are listed as noted.
 
 .. include:: ../../target/_includes/cdap-default-deprecated-table.rst
       :start-after: ---------------------
+
+
+.. include:: /_includes/cdap-default-table-test.rst
