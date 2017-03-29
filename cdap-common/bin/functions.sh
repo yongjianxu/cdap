@@ -670,25 +670,24 @@ cdap_start_java() {
     if [[ -n ${JAVA_LIBRARY_PATH} ]]; then
       __defines+=" -Djava.library.path=${JAVA_LIBRARY_PATH}"
     fi
-    # Check if we're HDP 2.2+, otherwise, do nothing (leave up to user)
-    if [[ $(which hdp-select 2>/dev/null) ]]; then
-      local readonly __hdp_version=$(hdp-select status hadoop-client | awk '{print $3}')
-      # Check for hdp.version in OPTS
-      if [[ ${OPTS} =~ -Dhdp.version ]]; then
-        local __my_hdp_version=$(echo ${OPTS} | grep -oP '\-Dhdp.version=\d+\.\d+\.\d+\.\d+-\d*' | cut -d= -f2)
-        if [[ ${__my_hdp_version} != ${__hdp_version} ]]; then
-          logecho "[WARN] HDP version mismatch!"
-          logecho "[WARN] Detected HDP version: ${__hdp_version}"
-          logecho "[WARN] Configured HDP version: ${__my_hdp_version}"
-          echo
-          logecho "[WARN] Using configured HDP version: ${__my_hdp_version}"
+    # Check for HDP 2.2+ or IOP, otherwise do nothing and leave up to the user to configure
+    for __dist in hdp iop; do
+      if [[ $(which ${__dist}-select 2>/dev/null) ]]; then
+        local __auto_version=$(${__dist}-select status hadoop-client | '{print $3}')
+        # Check for version configured in OPTS
+        if [[ ${OPTS} =~ -D${__dist}.version ]]; then
+          local __conf_version=$(echo ${OPTS} | grep -oP "\-D${__dist}.version=\d+\.\d+\.\d+\.\d+-\d+" | cut -d= -f2)
+          if [[ ${__conf_version} != ${__auto_version} ]]; then
+            logecho "[WARN] ${__dist^^} version mismatch! Detected: ${__auto_version}, Configured: ${__conf_version}"
+            logecho "[WARN] Using configured ${__dist^^} version: ${__conf_version}"
+          fi
+        else
+          # No version specified in OPTS or incorrect format, appending ours
+          __defines+=" -D${__dist}.version=${__auto_version}"
+          logecho "Detected ${__dist} version ${__auto_version} and adding to CDAP Master command line"
         fi
-      else
-        # No HDP version specified in OPTS or incorrect format, appending ours
-        __defines+=" -Dhdp.version=${__hdp_version}"
-        logecho "Detected HDP version ${__hdp_version} and adding to CDAP Master command line"
       fi
-    fi
+    done
 
     # Build and upload coprocessor jars
     logecho "$(date) Ensuring required HBase coprocessors are on HDFS"
