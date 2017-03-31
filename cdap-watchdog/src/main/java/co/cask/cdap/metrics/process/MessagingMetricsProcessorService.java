@@ -61,11 +61,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -218,10 +215,8 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
         Thread.currentThread().interrupt();
       }
     }
-    long lastRecordTime = TimeUnit.MILLISECONDS.toSeconds(records.peekLast().getTimestamp());
-    long delay = System.currentTimeMillis() - lastRecordTime;
     // Persist records and messageId's after all ProcessMetricsThread's complete.
-    persistRecordsMessageIds(records, lastRecordTime, delay, topicMessageIds);
+    persistRecordsMessageIds(records, topicMessageIds);
   }
 
   @Override
@@ -234,32 +229,33 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
     LOG.info("Metrics Processing Service stopped.");
   }
 
-  private void persistRecordsMessageIds(Deque<MetricValues> metricValues, long lastRecordTime, long delay,
-                                        Map<TopicIdMetaKey, byte[]> messageIds) {
+  private void persistRecordsMessageIds(Deque<MetricValues> metricValues, Map<TopicIdMetaKey, byte[]> messageIds) {
+    if (metricValues.isEmpty()) {
+      return;
+    }
     try {
-      if (!metricValues.isEmpty()) {
-        persistRecords(metricValues, lastRecordTime, delay);
-      }
+      long now = System.currentTimeMillis();
+      long lastRecordTime = TimeUnit.MILLISECONDS.toSeconds(metricValues.peekLast().getTimestamp());
+      long delay = now - lastRecordTime;
+      metricValues.add(
+        new MetricValues(metricsContextMap, TimeUnit.MILLISECONDS.toSeconds(now),
+                         ImmutableList.of(
+                           new MetricValue("metrics.process.count", MetricType.COUNTER, metricValues.size()),
+                           new MetricValue("metrics.process.delay.ms", MetricType.GAUGE, delay))));
+      metricStore.add(metricValues);
+      recordsProcessed += metricValues.size();
+      PROGRESS_LOG.debug("{} metrics records persisted. Last metric record's timestamp: {}. " +
+                           "Metrics process delay: {}", recordsProcessed, lastRecordTime, delay);
       try {
-        metaTable.saveMessageIds(messageIds);
+        if (!messageIds.isEmpty()) {
+          metaTable.saveMessageIds(messageIds);
+        }
       } catch (Exception e) {
         LOG.error("Failed to persist messageId's of consumed messages.", e);
       }
     } catch (Exception e) {
       LOG.error("Failed to persist metrics.", e);
     }
-  }
-
-  private void persistRecords(Queue<MetricValues> metricValues, long lastRecordTime, long delay) throws Exception {
-    metricValues.add(
-      new MetricValues(metricsContextMap, TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()), ImmutableList.of(
-        new MetricValue("metrics.process.count", MetricType.COUNTER, metricValues.size()),
-        new MetricValue("metrics.process.delay.ms", MetricType.GAUGE, delay))));
-    metricStore.add(metricValues);
-    recordsProcessed += metricValues.size();
-
-    PROGRESS_LOG.debug("{} metrics records persisted. Last metric record's timestamp: {}. Metrics process delay: {}",
-                       recordsProcessed, lastRecordTime, delay);
   }
 
   private class ProcessMetricsThread extends Thread {
@@ -300,7 +296,7 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
      * before the next run with the best effort to avoid accumulating unprocessed metrics
      *
      * @return the estimated sleep time before the next run with the best effort to avoid accumulating
-     *         unprocessed metrics, or {@code 0} if no sleep to catch-up with new metrics at best effort
+     * unprocessed metrics, or {@code 0} if no sleep to catch-up with new metrics at best effort
      */
     private long processMetrics() {
       long startTime = System.currentTimeMillis();
@@ -341,49 +337,58 @@ public class MessagingMetricsProcessorService extends AbstractExecutionThreadSer
           topicMessageIds.put(topicIdMetaKey, currentMessageId);
         }
 
-        // Skip persisting if the records is empty
-        if (records.isEmpty()) {
-          return metricsProcessIntervalMillis; // Sleep for maximum time allowed if no new metrics are received
-        }
+        // Try to persist metrics and messageId's of the last metrics to be persisted if no other thread is persisting
+        tryPersist();
 
-        // Ensure there's only one thread can persist records and messageId's when the persistingFlag is false.
-        // The thread set persistingFlag to true when it starts to persist.
-        if (!persistingFlag.compareAndSet(false, true)) {
-          LOG.trace("Cannot persist because persistingFlag is taken by another thread.");
-          // Don't sleep if delay between current time and the last metric's time is larger than maxDelayMillis
-          if (System.currentTimeMillis() - lastMetricTimeMillis > maxDelayMillis) {
-            return 0;
-          }
-          // Sleep for metricsProcessIntervalMillis if the delay is no larger than maxDelayMillis
-          return metricsProcessIntervalMillis;
-        }
-        Deque<MetricValues> recordsCopy = new LinkedList<>();
-        try {
-          Map<TopicIdMetaKey, byte[]> topicMessageIdsCopy = new HashMap<>(topicMessageIds);
-          Iterator<MetricValues> iterator = records.iterator();
-          while (iterator.hasNext() && recordsCopy.size() < queueSize) {
-            recordsCopy.add(iterator.next());
-            iterator.remove();
-          }
-          long lastRecordTime = TimeUnit.MILLISECONDS.toSeconds(recordsCopy.peekLast().getTimestamp());
-          long delay = System.currentTimeMillis() - lastRecordTime;
-          persistRecordsMessageIds(recordsCopy, delay, lastRecordTime, topicMessageIdsCopy);
-          // Don't sleep if delay between current time and the last metric's time is larger than maxDelayMillis
-          if (delay > maxDelayMillis) {
-            return 0;
-          }
-          // Sleep for metricsProcessIntervalMillis if the delay is no larger than maxDelayMillis
-          return metricsProcessIntervalMillis;
-        } catch (Exception e) {
-          LOG.error("Failed to persist consumed messages.", e);
-        } finally {
-          // Set persistingFlag back to false after persisting completes.
-          persistingFlag.set(false);
+        long endTime = System.currentTimeMillis();
+        if (endTime - lastMetricTimeMillis > maxDelayMillis) {
+          // Don't sleep if falling behind
+          return 0L;
+        } else {
+          long timeSpent = endTime - startTime;
+          return Math.max(0L, metricsProcessIntervalMillis - timeSpent);
         }
       } catch (Exception e) {
         LOG.warn("Failed to process metrics. Will be retried in next iteration.", e);
       }
       return metricsProcessIntervalMillis;
+    }
+
+    /**
+     * Persist metrics and messageId's of the last metrics to be persisted if no other thread is persisting
+     */
+    private void tryPersist() {
+      // Skip persisting if records is empty
+      if (records.isEmpty()) {
+        return;
+      }
+      // Ensure there's only one thread can persist records and messageId's.
+      // If persistingFlag is false, set it to true and start persisting. Otherwise, log and return.
+      if (!persistingFlag.compareAndSet(false, true)) {
+        LOG.trace("Cannot persist because persistingFlag is taken by another thread.");
+        return;
+      }
+      try {
+        // Make a copy of topicMessageIds before copying metrics from records to ensure that topicMessageIdsCopy will
+        // not contain new MessageId's in records but not in recordsCopy. This guarantees the metrics corresponding to
+        // last persisted MessageId's of each topic are persisted.
+        Map<TopicIdMetaKey, byte[]> topicMessageIdsCopy = new HashMap<>(topicMessageIds);
+        // Remove at most queueSize of metrics from records and put into recordsCopy to limit number of metrics
+        // to be persisted at once
+        Deque<MetricValues> recordsCopy = new LinkedList<>();
+        Iterator<MetricValues> iterator = records.iterator();
+        while (iterator.hasNext() && recordsCopy.size() < queueSize) {
+          recordsCopy.add(iterator.next());
+          iterator.remove();
+        }
+        // Persist the copy of metrics and MessageId's
+        persistRecordsMessageIds(recordsCopy, topicMessageIdsCopy);
+      } catch (Exception e) {
+        LOG.error("Failed to persist consumed messages.", e);
+      } finally {
+        // Set persistingFlag back to false after persisting completes.
+        persistingFlag.set(false);
+      }
     }
   }
 
