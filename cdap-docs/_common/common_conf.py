@@ -28,7 +28,7 @@
 
 import os
 import os.path
-# import sphinx_bootstrap_theme
+import sphinx_bootstrap_theme
 import subprocess
 import sys
 from datetime import datetime
@@ -478,8 +478,8 @@ highlight_language = 'java'
 
 # html_theme = 'bootstrap'
 # html_theme = 'cdap'
-# html_theme = 'cdap-bootstrap'
-html_theme = 'cdap-bootstrap-v1'
+html_theme = 'cdap-bootstrap'
+# html_theme = 'cdap-bootstrap-v1'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -575,7 +575,7 @@ html_google_tag_manager_code = ''
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['_themes','../../_common/_themes']
 
-# html_theme_path += sphinx_bootstrap_theme.get_html_theme_path()
+html_theme_path += sphinx_bootstrap_theme.get_html_theme_path()
 
 print "Using html_theme_path: %s" % html_theme_path
 
