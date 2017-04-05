@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Test AppMetadataStore.
@@ -76,7 +77,7 @@ public class AppMetadataStoreTest {
 
     Table table = datasetFramework.getDataset(storeTable, ImmutableMap.<String, String>of(), null);
     Assert.assertNotNull(table);
-    final AppMetadataStore metadataStoreDataset = new AppMetadataStore(table, cConf);
+    final AppMetadataStore metadataStoreDataset = new AppMetadataStore(table, cConf, new AtomicBoolean(false));
     TransactionExecutor txnl = txExecutorFactory.createExecutor(
       Collections.singleton((TransactionAware) metadataStoreDataset));
 
@@ -169,7 +170,7 @@ public class AppMetadataStoreTest {
 
     Table table = datasetFramework.getDataset(storeTable, ImmutableMap.<String, String>of(), null);
     Assert.assertNotNull(table);
-    final AppMetadataStore metadataStoreDataset = new AppMetadataStore(table, cConf);
+    final AppMetadataStore metadataStoreDataset = new AppMetadataStore(table, cConf, new AtomicBoolean(false));
 
     TransactionExecutor txnl = txExecutorFactory.createExecutor(
       Collections.singleton((TransactionAware) metadataStoreDataset));

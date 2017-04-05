@@ -310,6 +310,14 @@ public class MetadataStoreDataset extends AbstractDataset {
     }
   }
 
+  public void delete(MDSKey id) {
+    try {
+      table.delete(id.getKey(), COLUMN);
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
   public <T> void write(MDSKey id, T value) {
     try {
       table.put(new Put(id.getKey()).add(COLUMN, serialize(value)));

@@ -23,6 +23,7 @@ import co.cask.cdap.api.dataset.table.Row;
 import co.cask.cdap.api.dataset.table.Scanner;
 import co.cask.cdap.api.dataset.table.Table;
 import co.cask.cdap.api.schedule.SchedulableProgramType;
+import co.cask.cdap.common.utils.ProjectInfo;
 import co.cask.cdap.internal.app.runtime.schedule.AbstractSchedulerService;
 import co.cask.cdap.internal.app.runtime.schedule.StreamSizeScheduleState;
 import co.cask.cdap.internal.schedule.StreamSizeSchedule;
@@ -39,9 +40,12 @@ import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.tephra.TransactionAware;
+import org.apache.tephra.TransactionConflictException;
 import org.apache.tephra.TransactionExecutor;
 import org.apache.tephra.TransactionExecutorFactory;
 import org.apache.tephra.TransactionFailureException;
+import org.apache.tephra.TransactionNotInProgressException;
+import org.apache.twill.common.Threads;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +55,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 
 /**
@@ -62,6 +71,7 @@ public class DatasetBasedStreamSizeScheduleStore {
 
   private static final Gson GSON = new Gson();
   private static final String KEY_PREFIX = "streamSizeSchedule";
+  private static final byte[] APP_VERSION_UPGRADE_KEY = Bytes.toBytes("upgrade.streamsize.appversion.complete");
   private static final byte[] SCHEDULE_COL = Bytes.toBytes("schedule");
   private static final byte[] BASE_SIZE_COL = Bytes.toBytes("baseSize");
   private static final byte[] BASE_TS_COL = Bytes.toBytes("baseTs");
@@ -73,21 +83,43 @@ public class DatasetBasedStreamSizeScheduleStore {
 
   private final TransactionExecutorFactory factory;
   private final ScheduleStoreTableUtil tableUtil;
+  private final AtomicBoolean appVerUpgrade;
+  private final AtomicBoolean storeInitialized;
+  private ExecutorService executorService;
   private Table table;
 
   @Inject
   public DatasetBasedStreamSizeScheduleStore(TransactionExecutorFactory factory, ScheduleStoreTableUtil tableUtil) {
     this.tableUtil = tableUtil;
     this.factory = factory;
+    this.appVerUpgrade = new AtomicBoolean(false);
+    this.storeInitialized = new AtomicBoolean(false);
   }
 
   /**
    * Initialize this persistent store.
    */
   public synchronized void initialize() throws IOException, DatasetManagementException {
+    initializeTable();
+    executorService = Executors.newSingleThreadExecutor(
+      Threads.createDaemonThreadFactory("streamsize-schedulestore-appver-upgrade-checker"));
+    executorService.submit(new UpgradeCompleteCheck(APP_VERSION_UPGRADE_KEY, factory, table, appVerUpgrade));
+    storeInitialized.set(true);
+  }
+
+  private void initializeTable() throws IOException, DatasetManagementException {
     table = tableUtil.getMetaTable();
     Preconditions.checkNotNull(table, "Could not get dataset client for data set: %s",
                                ScheduleStoreTableUtil.SCHEDULE_STORE_DATASET_NAME);
+  }
+
+  /**
+   * Shuts down the Store.
+   */
+  public synchronized void shutdown() {
+    if (executorService != null) {
+      executorService.shutdown();
+    }
   }
 
   /**
@@ -221,16 +253,20 @@ public class DatasetBasedStreamSizeScheduleStore {
           String rowKey = String.format("%s:%s", KEY_PREFIX, AbstractSchedulerService.scheduleIdFor(
             programId, programType, scheduleName));
 
-          String versionLessRowKey = AbstractSchedulerService.removeAppVersion(rowKey);
-          if (versionLessRowKey != null) {
-            byte[] versionLessRowKeyBytes = Bytes.toBytes(versionLessRowKey);
-            Row versionLessRow = table.get(versionLessRowKeyBytes);
-            if (!versionLessRow.isEmpty()) {
-              table.delete(versionLessRowKeyBytes);
+          // If app version upgrade is not complete, check if we need to remove schedule which might be in older format
+          if (!isUpgradeComplete()) {
+            String versionLessRowKey = AbstractSchedulerService.removeAppVersion(rowKey);
+            if (versionLessRowKey != null) {
+              byte[] versionLessRowKeyBytes = Bytes.toBytes(versionLessRowKey);
+              Row versionLessRow = table.get(versionLessRowKeyBytes);
+              if (!versionLessRow.isEmpty()) {
+                table.delete(versionLessRowKeyBytes);
+              }
             }
           }
 
           table.delete(Bytes.toBytes(rowKey));
+
         }
       });
   }
@@ -273,8 +309,7 @@ public class DatasetBasedStreamSizeScheduleStore {
                 continue;
               }
 
-              SchedulableProgramType programType = SchedulableProgramType.valueOf(splits[4]);
-
+              SchedulableProgramType programType = program.getType().getSchedulableType();
               StreamSizeSchedule schedule = GSON.fromJson(Bytes.toString(scheduleBytes), StreamSizeSchedule.class);
               long baseSize = Bytes.toLong(baseSizeBytes);
               long baseTs = Bytes.toLong(baseTsBytes);
@@ -350,25 +385,98 @@ public class DatasetBasedStreamSizeScheduleStore {
   /**
    * Method to add version in StreamSizeSchedule row key in SchedulerStore.
    *
-   * @throws Exception
+   * @throws InterruptedException
+   * @throws IOException
+   * @throws DatasetManagementException
    */
-  public void upgrade()
-    throws InterruptedException, TransactionFailureException, IOException, DatasetManagementException {
-    initialize();
-    factory.createExecutor(ImmutableList.of((TransactionAware) table))
-      .execute(new TransactionExecutor.Subroutine() {
-        @Override
-        public void apply() {
-          upgradeVersionKeys();
+  public void upgrade() throws InterruptedException, IOException, DatasetManagementException {
+    // Wait until the store is initialized
+    while (!storeInitialized.get()) {
+      TimeUnit.SECONDS.sleep(10);
+    }
+
+    final AtomicBoolean upgradeComplete = new AtomicBoolean(false);
+    try {
+      factory.createExecutor(ImmutableList.of((TransactionAware) table))
+        .execute(new TransactionExecutor.Subroutine() {
+          @Override
+          public void apply() throws Exception {
+            byte[] result = table.get(APP_VERSION_UPGRADE_KEY, Bytes.toBytes('c'));
+            if (result != null) {
+              upgradeComplete.set(true);
+            }
+          }
+        });
+    } catch (TransactionFailureException e) {
+      // It is ok to ignore this error since this is an optimization check.
+      String errorMessage = "Initial check to see whether upgrade of StreamSizeScheduleStore is " +
+        "complete or not, has failed. Proceeding with upgrade.";
+      if (e instanceof TransactionConflictException | e instanceof TransactionNotInProgressException) {
+        LOG.trace(errorMessage, e);
+      } else {
+        LOG.error(errorMessage, e);
+      }
+    }
+
+    // If upgrade is already complete, then simply return.
+    if (upgradeComplete.get()) {
+      return;
+    }
+
+    final AtomicInteger maxRows = new AtomicInteger(10);
+    final AtomicInteger sleepTimeInMins = new AtomicInteger(1);
+    LOG.info("Starting upgrade of StreamSizeScheduleStore.");
+    while (!isUpgradeComplete()) {
+      sleepTimeInMins.set(1);
+      try {
+        factory.createExecutor(ImmutableList.of((TransactionAware) table))
+          .execute(new TransactionExecutor.Subroutine() {
+            @Override
+            public void apply() {
+              if (upgradeVersionKeys(table, maxRows.get())) {
+                // Upgrade is complete. Mark that app version upgrade is complete in the table.
+                table.put(APP_VERSION_UPGRADE_KEY, Bytes.toBytes('c'),
+                          Bytes.toBytes(ProjectInfo.getVersion().toString()));
+              }
+            }
+          });
+      } catch (TransactionFailureException e) {
+        if (e instanceof TransactionConflictException) {
+          LOG.debug("Upgrade step faced Transaction Conflict exception. Retrying operation now.", e);
+          sleepTimeInMins.set(0);
+        } else if (e instanceof TransactionNotInProgressException) {
+          int currMaxRows = maxRows.get();
+          if (currMaxRows > 1) {
+            maxRows.decrementAndGet();
+          }
+          sleepTimeInMins.set(0);
+          LOG.debug("Upgrade step faced a Transaction Timeout exception. " +
+                      "Reducing the number of max rows to : {} and retrying the operation now.", maxRows.get(), e);
+        } else {
+          LOG.error("Upgrade step faced exception. Will retry operation after some delay.", e);
+          sleepTimeInMins.set(1);
         }
-      });
+      }
+      TimeUnit.MINUTES.sleep(sleepTimeInMins.get());
+    }
+    LOG.info("Upgrade of StreamSizeScheduleStore is complete.");
   }
 
-  private void upgradeVersionKeys() {
+  // Returns true if the upgrade flag is set. Upgrade could have completed earlier than this since this flag is
+  // updated asynchronously.
+  public boolean isUpgradeComplete() {
+    return appVerUpgrade.get();
+  }
+
+  // Return whether the upgrade process is complete - determined by checking if there were no rows that were
+  // upgraded after the invocation of this method.
+  private boolean upgradeVersionKeys(Table table, int maxNumRows) {
+    int numRowsUpgraded = 0;
     Joiner joiner = Joiner.on(":");
     try (Scanner scan = getScannerWithPrefix(KEY_PREFIX)) {
       Row next;
-      while ((next = scan.next()) != null) {
+      // Upgrade only 10 rows in one transaction to reduce the probability of conflicts with regular Store operations.
+      while (((next = scan.next()) != null) && (numRowsUpgraded < maxNumRows)) {
         if (isInvalidRow(next)) {
           continue;
         }
@@ -387,13 +495,26 @@ public class DatasetBasedStreamSizeScheduleStore {
         splitsList.add(3, ApplicationId.DEFAULT_VERSION);
         String newRowKeyString = joiner.join(splitsList);
         byte[] newRowKey = Bytes.toBytes(newRowKeyString);
+
+        // Check if a newRowKey is already present, if it is present, then simply delete the oldRowKey and continue;
+        Row row = table.get(newRowKey);
+        if (!row.isEmpty()) {
+          table.delete(oldRowKey);
+          numRowsUpgraded++;
+          continue;
+        }
+
         Put put = new Put(newRowKey);
         for (Map.Entry<byte[], byte[]> colValEntry : next.getColumns().entrySet()) {
           put.add(colValEntry.getKey(), colValEntry.getValue());
         }
         table.put(put);
         table.delete(oldRowKey);
+        numRowsUpgraded++;
       }
     }
+
+    // If no rows were upgraded, notify that the upgrade process has completed.
+    return (numRowsUpgraded == 0);
   }
 }
