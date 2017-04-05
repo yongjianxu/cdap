@@ -53,7 +53,7 @@ public class LogDataOffsetProducer extends AbstractJSONLogProducer {
     LogData logData = new LogData(event.getTimeStamp(), event.getLevel().toString(), event.getThreadName(),
                                   className, simpleClassName, lineNumber, event.getFormattedMessage(),
                                   ThrowableProxyUtil.asString(event.getThrowableProxy()), event.getLoggerName(),
-                                  event.getMDCPropertyMap().get(".origin"));
+                                  event.getMDCPropertyMap());
     return modifyLogJsonElememnt(GSON.toJsonTree(new FormattedLogDataEvent(logData, logEvent.getOffset())));
   }
 

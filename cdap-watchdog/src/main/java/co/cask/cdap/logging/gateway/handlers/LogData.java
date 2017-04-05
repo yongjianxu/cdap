@@ -16,6 +16,8 @@
 
 package co.cask.cdap.logging.gateway.handlers;
 
+import java.util.Map;
+
 /**
  * Represents the structure of a log event.
  */
@@ -40,10 +42,10 @@ public final class LogData {
   @SuppressWarnings({"FieldCanBeLocal", "UnusedDeclaration"})
   private final String loggerName;
   @SuppressWarnings({"FieldCanBeLocal", "UnusedDeclaration"})
-  private final String origin;
+  private final Map<String, String> mdc;
 
   LogData(Long timestamp, String logLevel, String threadName, String className, String simpleClassName,
-          Integer lineNumber, String message, String stackTrace, String loggerName, String origin) {
+          Integer lineNumber, String message, String stackTrace, String loggerName, Map<String, String> mdc) {
     this.timestamp = timestamp;
     this.logLevel = logLevel;
     this.threadName = threadName;
@@ -53,7 +55,7 @@ public final class LogData {
     this.message = message;
     this.stackTrace = stackTrace;
     this.loggerName = loggerName;
-    this.origin = origin;
+    this.mdc = mdc;
   }
 
   public Long getTimestamp() {
@@ -92,7 +94,7 @@ public final class LogData {
     return loggerName;
   }
 
-  public String getOrigin() {
-    return origin;
+  public Map<String, String> getMDC() {
+    return mdc;
   }
 }

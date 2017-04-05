@@ -28,12 +28,18 @@ import co.cask.cdap.logging.appender.LogAppender;
 import co.cask.cdap.logging.appender.LogMessage;
 import co.cask.cdap.logging.serialize.LoggingEventSerializer;
 import co.cask.cdap.proto.id.NamespaceId;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.inject.Inject;
 import kafka.producer.KeyedMessage;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
@@ -47,9 +53,15 @@ public final class KafkaLogAppender extends LogAppender {
   private static final int QUEUE_SIZE = 512;
 
   private static final String APPENDER_NAME = "KafkaLogAppender";
+  private static final Map<String, String> classLoaderNameMap = new HashMap<>();
+  private static final Cache<String, String> classLoaderNameCache = CacheBuilder.newBuilder()
+    .maximumSize(1000).build();
 
   private final BlockingQueue<LogMessage> messageQueue;
   private final KafkaLogPublisher kafkaLogPublisher;
+
+  static long findClassLoaderTime = 0;
+  static int eventsCount = 0;
 
   @Inject
   KafkaLogAppender(CConfiguration cConf) {
@@ -67,6 +79,8 @@ public final class KafkaLogAppender extends LogAppender {
 
   @Override
   public void stop() {
+//    System.out.println(String.format("For %d logs, on average %.2f nanoseconds spent to find a classloader name.",
+//                                     eventsCount, findClassLoaderTime / (double) eventsCount));
     kafkaLogPublisher.stopAndWait();
     super.stop();
   }
@@ -271,19 +285,40 @@ public final class KafkaLogAppender extends LogAppender {
      */
     private void addOriginTag(LogMessage logMessage) {
       StackTraceElement[] callerData = logMessage.getCallerData();
-      if (callerData == null || callerData.length == 0 || callerData[0].isNativeMethod()) {
+      if (callerData == null || callerData.length == 0) {
+        logMessage.putSystemTag(".origin", "Caller data is empty");
+      }
+      if (callerData[0].isNativeMethod()) {
+        logMessage.putSystemTag(".origin", "callerData[0] is native: " + callerData[0].getClassName());
         return;
       }
-
+      long start = System.nanoTime();
       // TODO: Optimize with a size limited cache to avoid searching classloader
       ClassLoader classLoader = logMessage.getContextClassLoader();
       if (classLoader == null) {
+        logMessage.putSystemTag(".origin", "classLoader is null");
         return;
       }
 
       try {
-        String classLoaderName = classLoader.loadClass(callerData[0].getClassName())
-                                            .getClassLoader().getClass().getName();
+        String className = callerData[0].getClassName();
+//        String classLoaderName = classLoaderNameCache.getIfPresent(className);
+//          if (classLoaderName == null) {
+//            System.out.println(String.format("Put %s in cache", className));
+//            classLoaderName = classLoader.loadClass(className).getClassLoader().getClass().getName();
+//            classLoaderNameCache.put(className, classLoaderName);
+//          }
+//        if (classLoaderNameMap.containsKey(className)) {
+//          classLoaderName = classLoaderNameMap.get(className);
+//        } else {
+//          classLoaderName = classLoader.loadClass(className)
+//            .getClassLoader().getClass().getName();
+//          classLoaderNameMap.put(className, classLoaderName);
+//        }
+        String classLoaderName = classLoader.loadClass(className)
+          .getClassLoader().getClass().getName();
+//        findClassLoaderTime += System.nanoTime() - start;
+//        eventsCount++;
         logMessage.putSystemTag(".origin", classLoaderName);
 //        switch (classLoaderName) {
 //          case "co.cask.cdap.internal.app.runtime.plugin.PluginClassLoader":
@@ -293,6 +328,7 @@ public final class KafkaLogAppender extends LogAppender {
 //            logMessage.putSystemTag(".origin", "program");
 //        }
       } catch (Throwable t) {
+        logMessage.putSystemTag(".origin", "throwable caught: " + t.getMessage());
         // If not able to load the caller class, just don't add any tag
       }
     }

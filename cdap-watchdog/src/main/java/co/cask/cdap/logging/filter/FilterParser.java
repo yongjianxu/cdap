@@ -94,7 +94,12 @@ public final class FilterParser {
     } else if (key.equals("loglevel")) {
       // Log level
       return new LogLevelExpression(value);
-    } else {
+    } else if (key.equals("condensed")) {
+      return new OrFilter(ImmutableList.<Filter>of(
+        new MdcExpression(".origin", "co.cask.cdap.internal.app.runtime.plugin.PluginClassLoader"),
+        new MdcExpression(".origin", "co.cask.cdap.internal.app.runtime.ProgramClassLoader")));
+    }
+    else {
       throw new IllegalArgumentException(String.format("Unknown expression of type %s", key));
     }
   }

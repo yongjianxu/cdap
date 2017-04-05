@@ -58,6 +58,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Category(SlowTests.class)
 public class TestDistributedLogReader extends KafkaTestBase {
+  private static final Logger LOG = LoggerFactory.getLogger(TestDistributedLogReader.class);
+
   private static final FlowletLoggingContext LOGGING_CONTEXT_BOTH =
     new FlowletLoggingContext("TDL_NS_1", "APP_1", "FLOW_1", "FLOWLET_1", "RUN1", "INSTANCE1");
 
@@ -138,6 +140,15 @@ public class TestDistributedLogReader extends KafkaTestBase {
     new LogAppenderInitializer(kafkaAppender).initialize("TestDistributedLogReader-kafka-3");
     kafkaLogger = LoggerFactory.getLogger("TestDistributedLogReader-kafka-3");
     generateLogs(kafkaLogger, "Log message3", 0, 30);
+    kafkaAppender.stop();
+
+    // Generate logs for LOGGING_CONTEXT_KAFKA, logs only in kafka
+    LoggingContextAccessor.setLoggingContext(
+      new FlowletLoggingContext("TDL_NS_4", "APP_4", "FLOW_4", "FLOWLET_4", "RUN4", "INSTANCE4"));
+    kafkaAppender = injector.getInstance(KafkaLogAppender.class);
+    new LogAppenderInitializer(kafkaAppender).initialize("TestDistributedLogReader-kafka-4");
+    kafkaLogger = LoggerFactory.getLogger("TestDistributedLogReader-kafka-4");
+    generateLogs(kafkaLogger, "Log message4", 0, 1000);
     kafkaAppender.stop();
 
   }

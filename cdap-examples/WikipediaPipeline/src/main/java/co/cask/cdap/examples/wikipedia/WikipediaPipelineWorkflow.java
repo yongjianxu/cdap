@@ -21,6 +21,8 @@ import co.cask.cdap.api.workflow.AbstractWorkflow;
 import co.cask.cdap.api.workflow.Value;
 import co.cask.cdap.api.workflow.WorkflowContext;
 import co.cask.cdap.api.workflow.WorkflowToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
@@ -63,9 +65,11 @@ public class WikipediaPipelineWorkflow extends AbstractWorkflow {
   }
 
   static class EnoughDataToProceed implements Predicate<WorkflowContext> {
+    private static final Logger LOG = LoggerFactory.getLogger(EnoughDataToProceed.class);
 
     @Override
     public boolean apply(WorkflowContext context) {
+      LOG.info("USER EnoughDataToProceed");
       Map<String, String> runtimeArguments = context.getRuntimeArguments();
       int threshold = 10;
       if (runtimeArguments.containsKey(MIN_PAGES_THRESHOLD_KEY)) {
@@ -89,9 +93,11 @@ public class WikipediaPipelineWorkflow extends AbstractWorkflow {
   }
 
   static class IsWikipediaSourceOnline implements Predicate<WorkflowContext> {
+    private static final Logger LOG = LoggerFactory.getLogger(IsWikipediaSourceOnline.class);
 
     @Override
     public boolean apply(WorkflowContext context) {
+      LOG.info("USER IsWikipediaSourceOnline");
       WorkflowToken token = context.getToken();
       Value online = token.get(ONLINE_MODE, EnoughDataToProceed.class.getSimpleName(), WorkflowToken.Scope.USER);
       return online != null && online.getAsBoolean();
