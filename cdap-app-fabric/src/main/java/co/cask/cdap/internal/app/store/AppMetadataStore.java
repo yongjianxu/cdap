@@ -526,8 +526,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
           continue;
         }
         programRunIdRunRecordMetaMap.put(oldFormatEntry.getKey(), oldFormatEntry.getValue());
-        remaining--;
-        if (remaining <= 0) {
+        if (programRunIdRunRecordMetaMap.size() >= limit) {
           break;
         }
       }
@@ -585,8 +584,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
         }
 
         programRunIdRunRecordMetaMap.put(oldFormatEntry.getKey(), oldFormatEntry.getValue());
-        remaining--;
-        if (remaining <= 0) {
+        if (programRunIdRunRecordMetaMap.size() >= limit) {
           break;
         }
       }
@@ -627,8 +625,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
           continue;
         }
         programRunIdRunRecordMetaMap.put(oldFormatEntry.getKey(), oldFormatEntry.getValue());
-        remaining--;
-        if (remaining <= 0) {
+        if (programRunIdRunRecordMetaMap.size() >= limit) {
           break;
         }
       }
