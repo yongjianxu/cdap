@@ -273,8 +273,7 @@ public class DatasetBasedStreamSizeScheduleStore {
                 continue;
               }
 
-              SchedulableProgramType programType = SchedulableProgramType.valueOf(splits[4]);
-
+              SchedulableProgramType programType = program.getType().getSchedulableType();
               StreamSizeSchedule schedule = GSON.fromJson(Bytes.toString(scheduleBytes), StreamSizeSchedule.class);
               long baseSize = Bytes.toLong(baseSizeBytes);
               long baseTs = Bytes.toLong(baseTsBytes);

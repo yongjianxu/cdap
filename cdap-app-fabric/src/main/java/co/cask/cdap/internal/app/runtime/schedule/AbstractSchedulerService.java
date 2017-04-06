@@ -240,6 +240,12 @@ public abstract class AbstractSchedulerService extends AbstractIdleService imple
       return null;
     }
 
+    // If the version id is not the same as Default version, then return null since we don't want to delete the version
+    // less row key of that schedule
+    if (!parts[3].equals(ApplicationId.DEFAULT_VERSION)) {
+      return null;
+    }
+
     List<String> stringParts = new ArrayList<>(Arrays.asList(parts));
     stringParts.remove(3);
     return Joiner.on(":").join(stringParts);
