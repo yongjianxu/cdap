@@ -410,6 +410,12 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
       return null;
     }
 
+    // If the version id is not the same as Default version, then return null since we don't want to delete the version
+    // less row key of that schedule
+    if (!splits[2].equals(ApplicationId.DEFAULT_VERSION)) {
+      return null;
+    }
+
     List<String> splitArray = new ArrayList<>(Arrays.asList(splits));
     splitArray.remove(2);
     return new TriggerKey(Joiner.on(":").join(splitArray), key.getGroup());
@@ -417,9 +423,16 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
 
   private JobKey removeAppVersion(JobKey origJobKey) {
     String jobName = origJobKey.getName();
+    // New JobKey name has format = namespace:application:version:type:program
     String[] splits = jobName.split(":");
     if (splits.length != 5) {
       LOG.debug("Skip removing app version for job key since it doesn't have one : {}", jobName);
+      return null;
+    }
+
+    // If the version id is not the same as Default version, then return null since we don't want to delete the version
+    // less row key of that schedule
+    if (!splits[2].equals(ApplicationId.DEFAULT_VERSION)) {
       return null;
     }
 
@@ -470,7 +483,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
       return null;
     }
 
-    // New JobKey name has format = namespace:version:application:type:program
+    // New JobKey name has format = namespace:application:version:type:program
     String newJobName = getNameWithVersion(oldJobNameSplits);
     oldTrigger.trigger.setJobKey(new JobKey(newJobName, oldTriggerJobKey.getGroup()));
     return oldTrigger;

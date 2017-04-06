@@ -236,7 +236,9 @@ public abstract class AbstractSchedulerService extends AbstractIdleService imple
   @Nullable
   public static String removeAppVersion(String scheduleId) {
     String[] parts = scheduleId.split(":");
-    if (parts.length != 6) {
+    // New Row key for the trigger should be of the form -
+    // streamSizeSchedule:namespace:application:version:type:program:schedule
+    if (parts.length != 7) {
       return null;
     }
 
