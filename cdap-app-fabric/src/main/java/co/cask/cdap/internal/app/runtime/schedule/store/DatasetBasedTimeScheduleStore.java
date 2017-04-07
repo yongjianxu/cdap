@@ -174,7 +174,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
         .execute(new TransactionExecutor.Subroutine() {
           @Override
           public void apply() throws Exception {
-            if (versionLessTriggerKey != null && readTrigger(versionLessTriggerKey) != null) {
+            if (versionLessTriggerKey != null) {
               removeTrigger(table, versionLessTriggerKey);
             }
             removeTrigger(table, triggerKey);
@@ -192,7 +192,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
         .execute(new TransactionExecutor.Subroutine() {
           @Override
           public void apply() throws Exception {
-            if (versionLessJobKey != null && readJob(versionLessJobKey) != null) {
+            if (versionLessJobKey != null) {
               removeJob(table, versionLessJobKey);
             }
             removeJob(table, jobKey);

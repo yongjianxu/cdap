@@ -221,15 +221,10 @@ public class DatasetBasedStreamSizeScheduleStore {
         public void apply() throws Exception {
           String rowKey = getRowKey(programId, programType, scheduleName);
 
-          String versionLessRowKey = AbstractSchedulerService.removeAppVersion(rowKey);
+          String versionLessRowKey = removeAppVersion(rowKey);
           if (versionLessRowKey != null) {
-            byte[] versionLessRowKeyBytes = Bytes.toBytes(versionLessRowKey);
-            Row versionLessRow = table.get(versionLessRowKeyBytes);
-            if (!versionLessRow.isEmpty()) {
-              table.delete(versionLessRowKeyBytes);
-            }
+            table.delete(Bytes.toBytes(versionLessRowKey));
           }
-
           table.delete(Bytes.toBytes(rowKey));
         }
       });
@@ -335,6 +330,26 @@ public class DatasetBasedStreamSizeScheduleStore {
           LOG.debug("Updated schedule {} with columns {}, values {}", scheduleName, columns, values);
         }
       });
+  }
+
+  @Nullable
+  String removeAppVersion(String scheduleId) {
+    String[] parts = scheduleId.split(":");
+    // New Row key for the trigger should be of the form -
+    // streamSizeSchedule:namespace:application:version:type:program:schedule
+    if (parts.length != 7) {
+      return null;
+    }
+
+    // If the version id is not the same as Default version, then return null since we don't want to delete the version
+    // less row key of that schedule
+    if (!parts[3].equals(ApplicationId.DEFAULT_VERSION)) {
+      return null;
+    }
+
+    List<String> stringParts = new ArrayList<>(Arrays.asList(parts));
+    stringParts.remove(3);
+    return Joiner.on(":").join(stringParts);
   }
 
   /**

@@ -30,7 +30,6 @@ import co.cask.cdap.proto.ScheduledRuntime;
 import co.cask.cdap.proto.id.ApplicationId;
 import co.cask.cdap.proto.id.NamespaceId;
 import co.cask.cdap.proto.id.ProgramId;
-import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -38,11 +37,8 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 
 /**
  * Abstract scheduler service common scheduling functionality. For each {@link Schedule} implementation, there is
@@ -231,26 +227,6 @@ public abstract class AbstractSchedulerService extends AbstractIdleService imple
     } catch (NotFoundException e) {
       return ScheduleState.NOT_FOUND;
     }
-  }
-
-  @Nullable
-  public static String removeAppVersion(String scheduleId) {
-    String[] parts = scheduleId.split(":");
-    // New Row key for the trigger should be of the form -
-    // streamSizeSchedule:namespace:application:version:type:program:schedule
-    if (parts.length != 7) {
-      return null;
-    }
-
-    // If the version id is not the same as Default version, then return null since we don't want to delete the version
-    // less row key of that schedule
-    if (!parts[3].equals(ApplicationId.DEFAULT_VERSION)) {
-      return null;
-    }
-
-    List<String> stringParts = new ArrayList<>(Arrays.asList(parts));
-    stringParts.remove(3);
-    return Joiner.on(":").join(stringParts);
   }
 
   public static String scheduleIdFor(ProgramId program, SchedulableProgramType programType, String scheduleName) {

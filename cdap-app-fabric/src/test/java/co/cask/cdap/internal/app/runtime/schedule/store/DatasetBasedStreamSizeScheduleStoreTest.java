@@ -24,7 +24,6 @@ import co.cask.cdap.api.schedule.SchedulableProgramType;
 import co.cask.cdap.data2.dataset2.DatasetFramework;
 import co.cask.cdap.data2.transaction.TransactionExecutorFactory;
 import co.cask.cdap.internal.AppFabricTestHelper;
-import co.cask.cdap.internal.app.runtime.schedule.AbstractSchedulerService;
 import co.cask.cdap.internal.app.runtime.schedule.StreamSizeScheduleState;
 import co.cask.cdap.internal.schedule.StreamSizeSchedule;
 import co.cask.cdap.proto.Id;
@@ -116,7 +115,7 @@ public class DatasetBasedStreamSizeScheduleStoreTest {
         Row row = table.get(Bytes.toBytes(scheduleStore.getRowKey(programId, PROGRAM_TYPE,
                                                                   STREAM_SCHEDULE_1.getName())));
         Assert.assertFalse(row.isEmpty());
-        byte[] oldRowKey = Bytes.toBytes(AbstractSchedulerService.removeAppVersion(newRowKey));
+        byte[] oldRowKey = Bytes.toBytes(scheduleStore.removeAppVersion(newRowKey));
         for (Map.Entry<byte[], byte[]> entry : row.getColumns().entrySet()) {
           table.put(oldRowKey, entry.getKey(), entry.getValue());
         }
@@ -166,7 +165,7 @@ public class DatasetBasedStreamSizeScheduleStoreTest {
           ProgramId defaultProgramId = new ProgramId(programId.getNamespace(), programId.getApplication(),
                                                      programId.getType(), programId.getProgram());
           String newRowKey = scheduleStore.getRowKey(defaultProgramId, PROGRAM_TYPE, STREAM_SCHEDULE_1.getName());
-          byte[] oldRowKey = Bytes.toBytes(AbstractSchedulerService.removeAppVersion(newRowKey));
+          byte[] oldRowKey = Bytes.toBytes(scheduleStore.removeAppVersion(newRowKey));
           Row row = table.get(oldRowKey);
           Assert.assertFalse(row.isEmpty());
           table.delete(oldRowKey);
