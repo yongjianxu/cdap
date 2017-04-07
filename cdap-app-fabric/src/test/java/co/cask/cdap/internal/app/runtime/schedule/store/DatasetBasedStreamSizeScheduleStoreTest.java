@@ -79,11 +79,11 @@ public class DatasetBasedStreamSizeScheduleStoreTest {
 
   @Test
   public void testOldDataFormatCompatibility() throws Exception {
-    testOldFormat(PROGRAM_ID);
-    testOldFormat(PROGRAM_ID_V1);
+    testDeletion(PROGRAM_ID);
+    testDeletion(PROGRAM_ID_V1);
   }
 
-  private void testOldFormat(final ProgramId programId) throws Exception {
+  private void testDeletion(final ProgramId programId) throws Exception {
     final boolean defaultVersion = programId.getVersion().equals(ApplicationId.DEFAULT_VERSION);
     DatasetId storeTable = NamespaceId.SYSTEM.dataset(ScheduleStoreTableUtil.SCHEDULE_STORE_DATASET_NAME);
     final Table table = datasetFramework.getDataset(storeTable, ImmutableMap.<String, String>of(), null);

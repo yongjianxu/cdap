@@ -400,7 +400,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     String[] splits = jobName.split(":");
     // New TriggerKey name has format = namespace:application:version:type:program:schedule
     if (splits.length != 6) {
-      LOG.debug("Skip removing app version for trigger key since it doesn't have one : {}", jobName);
       return null;
     }
 
@@ -421,7 +420,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     // New JobKey name has format = namespace:application:version:type:program
     String[] splits = jobName.split(":");
     if (splits.length != 5) {
-      LOG.debug("Skip removing app version for job key since it doesn't have one : {}", jobName);
       return null;
     }
 
@@ -465,8 +463,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     String[] oldJobNameSplits = oldTriggerJobKey.getName().split(":");
     // Old JobKey name has format = namespace:application:type:program
     if (oldJobNameSplits.length != 4) {
-      LOG.debug("Skip upgrading Trigger {} with Job {}. Expected job key format " +
-                  "'namespace:application:type:program'", oldTriggerKey, oldTriggerJobKey);
       return false;
     }
 
