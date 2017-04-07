@@ -29,6 +29,7 @@ import co.cask.cdap.internal.schedule.StreamSizeSchedule;
 import co.cask.cdap.proto.ProgramType;
 import co.cask.cdap.proto.id.ApplicationId;
 import co.cask.cdap.proto.id.ProgramId;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -58,10 +59,10 @@ import javax.annotation.Nullable;
  */
 @Singleton
 public class DatasetBasedStreamSizeScheduleStore {
-  private static final Logger LOG = LoggerFactory.getLogger(DatasetBasedStreamSizeScheduleStore.class);
+  public static final String KEY_PREFIX = "streamSizeSchedule";
 
+  private static final Logger LOG = LoggerFactory.getLogger(DatasetBasedStreamSizeScheduleStore.class);
   private static final Gson GSON = new Gson();
-  private static final String KEY_PREFIX = "streamSizeSchedule";
   private static final byte[] SCHEDULE_COL = Bytes.toBytes("schedule");
   private static final byte[] BASE_SIZE_COL = Bytes.toBytes("baseSize");
   private static final byte[] BASE_TS_COL = Bytes.toBytes("baseTs");
@@ -162,9 +163,9 @@ public class DatasetBasedStreamSizeScheduleStore {
                             long newBaseRunSize, long newBaseRunTs)
     throws TransactionFailureException, InterruptedException {
       updateTable(programId, programType, scheduleName,
-                new byte[][]{ BASE_SIZE_COL, BASE_TS_COL },
-                new byte[][]{ Bytes.toBytes(newBaseRunSize), Bytes.toBytes(newBaseRunTs) },
-                null);
+                  new byte[][]{BASE_SIZE_COL, BASE_TS_COL},
+                  new byte[][]{Bytes.toBytes(newBaseRunSize), Bytes.toBytes(newBaseRunTs)},
+                  null);
   }
 
   /**
@@ -183,8 +184,8 @@ public class DatasetBasedStreamSizeScheduleStore {
                             TransactionMethod txMethod)
     throws TransactionFailureException, InterruptedException {
     updateTable(programId, programType, scheduleName,
-                new byte[][]{ LAST_RUN_SIZE_COL, LAST_RUN_TS_COL },
-                new byte[][]{ Bytes.toBytes(newLastRunSize), Bytes.toBytes(newLastRunTs) },
+                new byte[][]{LAST_RUN_SIZE_COL, LAST_RUN_TS_COL},
+                new byte[][]{Bytes.toBytes(newLastRunSize), Bytes.toBytes(newLastRunTs)},
                 txMethod);
   }
 
@@ -218,8 +219,7 @@ public class DatasetBasedStreamSizeScheduleStore {
       .execute(new TransactionExecutor.Subroutine() {
         @Override
         public void apply() throws Exception {
-          String rowKey = String.format("%s:%s", KEY_PREFIX, AbstractSchedulerService.scheduleIdFor(
-            programId, programType, scheduleName));
+          String rowKey = getRowKey(programId, programType, scheduleName);
 
           String versionLessRowKey = AbstractSchedulerService.removeAppVersion(rowKey);
           if (versionLessRowKey != null) {
@@ -233,6 +233,12 @@ public class DatasetBasedStreamSizeScheduleStore {
           table.delete(Bytes.toBytes(rowKey));
         }
       });
+  }
+
+  @VisibleForTesting
+  String getRowKey(ProgramId programId, SchedulableProgramType programType, String scheduleName) {
+    return String.format("%s:%s", KEY_PREFIX, AbstractSchedulerService.scheduleIdFor(
+      programId, programType, scheduleName));
   }
 
   /**
@@ -324,9 +330,7 @@ public class DatasetBasedStreamSizeScheduleStore {
           if (txMethod != null) {
             txMethod.execute();
           }
-          byte[] rowKey = Bytes.toBytes(String.format("%s:%s", KEY_PREFIX,
-                                                      AbstractSchedulerService.scheduleIdFor(programId, programType,
-                                                                                             scheduleName)));
+          byte[] rowKey = Bytes.toBytes(getRowKey(programId, programType, scheduleName));
           table.put(rowKey, columns, values);
           LOG.debug("Updated schedule {} with columns {}, values {}", scheduleName, columns, values);
         }

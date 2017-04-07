@@ -546,8 +546,9 @@ public class AppMetadataStore extends MetadataStoreDataset {
     return getNonCompleteRuns(programRunIds, TYPE_RUN_RECORD_COMPLETED, limit);
   }
 
-  private Map<ProgramRunId, RunRecordMeta> getNonCompleteRuns(Set<ProgramRunId> programRunIds, String recordType,
+  private Map<ProgramRunId, RunRecordMeta> getNonCompleteRuns(Set<ProgramRunId> runIds, String recordType,
                                                               int limit) {
+    Set<ProgramRunId> programRunIds = new HashSet<>(runIds);
     Set<MDSKey> keySet = new HashSet<>();
     for (ProgramRunId programRunId : programRunIds) {
       keySet.add(getProgramKeyBuilder(recordType, programRunId).build());
@@ -556,20 +557,24 @@ public class AppMetadataStore extends MetadataStoreDataset {
     Map<ProgramRunId, RunRecordMeta> programRunIdRunRecordMetaMap = getProgramRunIdMap(returnMap);
     Set<ProgramRunId> candidateSet = Sets.newHashSet(programRunIdRunRecordMetaMap.keySet());
     for (ProgramRunId programRunId : candidateSet) {
-      // If the program run id, doesn't match with the requested set, remove it.
       if (!programRunIds.contains(programRunId)) {
+        // If the program run id, doesn't match with the requested set, remove it.
         programRunIdRunRecordMetaMap.remove(programRunId);
+      } else {
+        // If the program run id was found, remove it from the request set.
+        programRunIds.remove(programRunId);
       }
     }
 
     int remaining = limit - programRunIdRunRecordMetaMap.size();
-    if (remaining > 0) {
+    if (remaining > 0 && (!programRunIds.isEmpty())) {
       keySet.clear();
       for (ProgramRunId programRunId : programRunIds) {
         if (programRunId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
           keySet.add(getVersionLessProgramKeyBuilder(recordType, programRunId).build());
         }
       }
+
       returnMap = listKV(keySet, RunRecordMeta.class, remaining);
       Map<ProgramRunId, RunRecordMeta> versionLessMap = getProgramRunIdMap(returnMap);
       for (Map.Entry<ProgramRunId, RunRecordMeta> oldFormatEntry : versionLessMap.entrySet()) {
