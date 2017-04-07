@@ -214,6 +214,7 @@ public class DatasetBasedTimeScheduleStoreTest {
 
     newCount = scheduler.getJobKeys(GroupMatcher.anyJobGroup()).size();
     Assert.assertEquals(oldCount, newCount);
+    schedulerTearDown();
   }
 
   @Test
