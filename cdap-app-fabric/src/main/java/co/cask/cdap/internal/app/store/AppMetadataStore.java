@@ -149,9 +149,9 @@ public class AppMetadataStore extends MetadataStoreDataset {
     for (MDSKey key : listKV(new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build(),
                              ApplicationMeta.class).keySet()) {
       MDSKey.Splitter splitter = key.split();
-      splitter.getBytes(); // skip recordType
-      splitter.getBytes(); // skip namespaceId
-      splitter.getBytes(); // skip appId
+      splitter.skipBytes(); // skip recordType
+      splitter.skipBytes(); // skip namespaceId
+      splitter.skipBytes(); // skip appId
       String versionId;
       try {
         versionId = splitter.getString();
