@@ -200,7 +200,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     } catch (Throwable t) {
       throw Throwables.propagate(t);
     }
-
   }
 
   private void persistChangeOfState(final TriggerKey triggerKey, final Trigger.TriggerState newTriggerState) {
@@ -268,21 +267,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     table.delete(JOB_KEY, col);
   }
 
-  private JobDetail readJob(JobKey jobKey) {
-    byte[][] cols = new byte[1][];
-    cols[0] = Bytes.toBytes(jobKey.toString());
-    Row result = table.get(JOB_KEY, cols);
-    byte[] bytes = null;
-    if (!result.isEmpty()) {
-      bytes = result.get(cols[0]);
-    }
-    if (bytes != null) {
-      return (JobDetail) SerializationUtils.deserialize(bytes);
-    } else {
-      return null;
-    }
-  }
-
   private void removeTrigger(Table table, TriggerKey key) {
     byte[][] col = new byte[1][];
     col[0] = Bytes.toBytes(key.getName());
@@ -344,7 +328,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
           if (!result.isEmpty()) {
             for (byte[] bytes : result.getColumns().values()) {
               TriggerStatusV2 trigger = (TriggerStatusV2) SerializationUtils.deserialize(bytes);
-              addDefaultAppVersionIfNeeded(trigger);
+              addedDefaultAppVersion(trigger);
               if (trigger.state.equals(Trigger.TriggerState.NORMAL) ||
                 trigger.state.equals(Trigger.TriggerState.PAUSED)) {
                 triggers.add(trigger);
@@ -450,7 +434,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
       .build();
   }
 
-  private boolean addDefaultAppVersionIfNeeded(TriggerStatusV2 oldTrigger) {
+  private boolean addedDefaultAppVersion(TriggerStatusV2 oldTrigger) {
     TriggerKey oldTriggerKey = oldTrigger.trigger.getKey();
     JobKey oldTriggerJobKey = oldTrigger.trigger.getJobKey();
 
@@ -502,7 +486,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     for (byte[] column : result.getColumns().values()) {
       TriggerStatusV2 triggerStatus = (TriggerStatusV2) SerializationUtils.deserialize(column);
       TriggerKey oldTriggerKey = triggerStatus.trigger.getKey();
-      boolean modified = addDefaultAppVersionIfNeeded(triggerStatus);
+      boolean modified = addedDefaultAppVersion(triggerStatus);
 
       if (modified) {
         persistTrigger(table, triggerStatus.trigger, triggerStatus.state);
