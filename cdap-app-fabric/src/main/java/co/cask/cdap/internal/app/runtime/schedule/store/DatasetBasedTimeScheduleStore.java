@@ -24,6 +24,7 @@ import co.cask.cdap.common.conf.CConfiguration;
 import co.cask.cdap.common.conf.Constants;
 import co.cask.cdap.internal.app.runtime.schedule.DefaultSchedulerService;
 import co.cask.cdap.proto.id.ApplicationId;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -262,15 +263,9 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     table.put(JOB_KEY, cols, values);
   }
 
-  private void removeTrigger(Table table, TriggerKey key) {
-    byte[][] col = new byte[1][];
-    col[0] = Bytes.toBytes(key.getName());
-    table.delete(TRIGGER_KEY, col);
-  }
-
   private void removeJob(Table table, JobKey key) {
     byte[][] col = new byte[1][];
-    col[0] = Bytes.toBytes(key.getName());
+    col[0] = Bytes.toBytes(key.toString());
     table.delete(JOB_KEY, col);
   }
 
@@ -287,6 +282,12 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     } else {
       return null;
     }
+  }
+
+  private void removeTrigger(Table table, TriggerKey key) {
+    byte[][] col = new byte[1][];
+    col[0] = Bytes.toBytes(key.getName());
+    table.delete(TRIGGER_KEY, col);
   }
 
   private TriggerStatusV2 readTrigger(TriggerKey key) {
@@ -401,7 +402,8 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
       });
   }
 
-  private TriggerKey removeAppVersion(TriggerKey key) {
+  @VisibleForTesting
+  TriggerKey removeAppVersion(TriggerKey key) {
     String jobName = key.getName();
     String[] splits = jobName.split(":");
     // New TriggerKey name has format = namespace:application:version:type:program:schedule
@@ -421,7 +423,8 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     return new TriggerKey(Joiner.on(":").join(splitArray), key.getGroup());
   }
 
-  private JobKey removeAppVersion(JobKey origJobKey) {
+  @VisibleForTesting
+  JobKey removeAppVersion(JobKey origJobKey) {
     String jobName = origJobKey.getName();
     // New JobKey name has format = namespace:application:version:type:program
     String[] splits = jobName.split(":");
