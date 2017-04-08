@@ -178,8 +178,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
     // Check again without the version to account for old data format if might not have been upgraded yet
     if (existing == null && (versionId.equals(ApplicationId.DEFAULT_VERSION))) {
-      key = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
-      existing = getFirst(key, ApplicationMeta.class);
+      MDSKey versionLessKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
+      existing = getFirst(versionLessKey, ApplicationMeta.class);
     }
 
     if (existing == null) {
