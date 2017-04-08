@@ -23,6 +23,8 @@ import co.cask.cdap.api.dataset.table.Row;
 import co.cask.cdap.api.dataset.table.Scanner;
 import co.cask.cdap.api.dataset.table.Table;
 import co.cask.cdap.api.schedule.SchedulableProgramType;
+import co.cask.cdap.common.logging.LogSamplers;
+import co.cask.cdap.common.logging.Loggers;
 import co.cask.cdap.internal.app.runtime.schedule.AbstractSchedulerService;
 import co.cask.cdap.internal.app.runtime.schedule.StreamSizeScheduleState;
 import co.cask.cdap.internal.schedule.StreamSizeSchedule;
@@ -62,6 +64,11 @@ public class DatasetBasedStreamSizeScheduleStore {
   public static final String KEY_PREFIX = "streamSizeSchedule";
 
   private static final Logger LOG = LoggerFactory.getLogger(DatasetBasedStreamSizeScheduleStore.class);
+  // Limit the number of logs when the rows have invalid columns. This will be called only during the startup when the
+  // scheduler is initialized from the store entries and since we don't expect to have many data sized schedules,
+  // we can log once every N log calls
+  private static final Logger LIMITED_LOG = Loggers.sampling(LOG, LogSamplers.onceEvery(100));
+
   private static final Gson GSON = new Gson();
   private static final byte[] SCHEDULE_COL = Bytes.toBytes("schedule");
   private static final byte[] BASE_SIZE_COL = Bytes.toBytes("baseSize");
@@ -256,6 +263,8 @@ public class DatasetBasedStreamSizeScheduleStore {
               byte[] activeBytes = row.get(ACTIVE_COL);
               byte[] propertyBytes = row.get(PROPERTIES_COL);
               if (isInvalidRow(row)) {
+                LIMITED_LOG.debug("Stream Sized Schedule entry with Row key {} does not have all columns.",
+                                  Bytes.toString(row.getRow()));
                 continue;
               }
 
@@ -388,6 +397,8 @@ public class DatasetBasedStreamSizeScheduleStore {
       Row next;
       while ((next = scan.next()) != null) {
         if (isInvalidRow(next)) {
+          LIMITED_LOG.debug("Stream Sized Schedule entry with Row key {} does not have all columns.",
+                            Bytes.toString(next.getRow()));
           continue;
         }
         byte[] oldRowKey = next.getRow();
