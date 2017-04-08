@@ -124,16 +124,9 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
 
     if (versionId.equals(ApplicationId.DEFAULT_VERSION)) {
-      List<ApplicationMeta> appMetas = list(new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build(),
-                                            ApplicationMeta.class);
-      // If the app version is same as the default version, then return it.
-      for (ApplicationMeta meta : appMetas) {
-        if (meta.getSpec().getAppVersion().equals(ApplicationId.DEFAULT_VERSION)) {
-          return meta;
-        }
-      }
+      appMeta = get(new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build(), ApplicationMeta.class);
     }
-    return null;
+    return appMeta;
   }
 
   public List<ApplicationMeta> getAllApplications(String namespaceId) {
