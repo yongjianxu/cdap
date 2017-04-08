@@ -381,41 +381,40 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
   @VisibleForTesting
   TriggerKey removeAppVersion(TriggerKey key) {
     String jobName = key.getName();
-    String[] splits = jobName.split(":");
     // New TriggerKey name has format = namespace:application:version:type:program:schedule
-    if (splits.length != 6) {
+    String versionLessJobName = splitAndRemovePart(jobName, 6, 2);
+
+    if (versionLessJobName == null) {
       return null;
     }
-
-    // If the version id is not the same as Default version, then return null since we don't want to delete the version
-    // less row key of that schedule
-    if (!splits[2].equals(ApplicationId.DEFAULT_VERSION)) {
-      return null;
-    }
-
-    List<String> splitArray = new ArrayList<>(Arrays.asList(splits));
-    splitArray.remove(2);
-    return new TriggerKey(Joiner.on(":").join(splitArray), key.getGroup());
+    return new TriggerKey(versionLessJobName, key.getGroup());
   }
 
   @VisibleForTesting
   JobKey removeAppVersion(JobKey origJobKey) {
     String jobName = origJobKey.getName();
     // New JobKey name has format = namespace:application:version:type:program
-    String[] splits = jobName.split(":");
-    if (splits.length != 5) {
+    String versionLessJobName = splitAndRemovePart(jobName, 5, 2);
+
+    if (versionLessJobName == null) {
+      return null;
+    }
+    return new JobKey(versionLessJobName, origJobKey.getGroup());
+  }
+
+  private String splitAndRemovePart(String origString, int lengthCheck, int versionIdx) {
+    String[] splits = origString.split(":");
+    if (splits.length != lengthCheck) {
       return null;
     }
 
-    // If the version id is not the same as Default version, then return null since we don't want to delete the version
-    // less row key of that schedule
-    if (!splits[2].equals(ApplicationId.DEFAULT_VERSION)) {
+    if (!splits[versionIdx].equals(ApplicationId.DEFAULT_VERSION)) {
       return null;
     }
 
     List<String> splitArray = new ArrayList<>(Arrays.asList(splits));
-    splitArray.remove(2);
-    return new JobKey(Joiner.on(":").join(splitArray), origJobKey.getGroup());
+    splitArray.remove(versionIdx);
+    return Joiner.on(":").join(splitArray);
   }
 
   private JobDetail addDefaultAppVersionIfNeeded(JobDetail origJobDetail) {
