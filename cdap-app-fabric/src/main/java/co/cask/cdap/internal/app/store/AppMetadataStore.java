@@ -262,7 +262,12 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
   public void recordProgramStart(ProgramId programId, String pid, long startTs, String twillRunId,
                                  Map<String, String> runtimeArgs, Map<String, String> systemArgs) {
+    recordProgramStart(programId, pid, startTs, twillRunId, runtimeArgs, systemArgs, false);
+  }
 
+  @VisibleForTesting
+  void recordProgramStart(ProgramId programId, String pid, long startTs, String twillRunId,
+                          Map<String, String> runtimeArgs, Map<String, String> systemArgs, boolean versionLess) {
     String workflowrunId = null;
     if (systemArgs != null && systemArgs.containsKey(ProgramOptionConstants.WORKFLOW_NAME)) {
       // Program is started by Workflow. Add row corresponding to its node state.
@@ -271,6 +276,9 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
 
     MDSKey key = getProgramKeyBuilder(TYPE_RUN_RECORD_STARTED, programId).add(pid).build();
+    if (versionLess) {
+      key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_STARTED, programId).add(pid).build();
+    }
 
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     builder.put("runtimeArgs", GSON.toJson(runtimeArgs, MAP_STRING_STRING_TYPE));
@@ -334,6 +342,12 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
   public void recordProgramStop(ProgramId programId, String pid, long stopTs, ProgramRunStatus runStatus,
                                 @Nullable BasicThrowable failureCause) {
+    recordProgramStop(programId, pid, stopTs, runStatus, failureCause, false);
+  }
+
+  @VisibleForTesting
+  void recordProgramStop(ProgramId programId, String pid, long stopTs, ProgramRunStatus runStatus,
+                                @Nullable BasicThrowable failureCause, boolean versionLess) {
     MDSKey key = getProgramKeyBuilder(TYPE_RUN_RECORD_STARTED, programId)
       .add(pid)
       .build();
@@ -362,10 +376,14 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
     deleteAll(key);
 
-    key = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId)
-      .add(getInvertedTsKeyPart(started.getStartTs()))
-      .add(pid).build();
+    MDSKey.Builder builder;
+    if (versionLess) {
+      builder = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId);
+    } else {
+      builder = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId);
+    }
 
+    key = builder.add(getInvertedTsKeyPart(started.getStartTs())).add(pid).build();
     write(key, new RunRecordMeta(started, stopTs, runStatus));
   }
 
@@ -386,8 +404,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
   }
 
   public  Map<ProgramRunId, RunRecordMeta> getRuns(@Nullable ProgramId programId, ProgramRunStatus status,
-                                     long startTime, long endTime, int limit,
-                                     @Nullable Predicate<RunRecordMeta> filter) {
+                                                   long startTime, long endTime, int limit,
+                                                   @Nullable Predicate<RunRecordMeta> filter) {
     if (status.equals(ProgramRunStatus.ALL)) {
       Map<ProgramRunId, RunRecordMeta> resultmap =  new LinkedHashMap<>();
       resultmap.putAll(getActiveRuns(programId, startTime, endTime, limit, filter));

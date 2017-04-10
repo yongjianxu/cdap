@@ -69,6 +69,56 @@ public class AppMetadataStoreTest {
   }
 
   @Test
+  public void testOldRunRecordFormat() throws Exception {
+    DatasetId storeTable = NamespaceId.DEFAULT.dataset("testOldRunRecordFormat");
+    datasetFramework.addInstance(Table.class.getName(), storeTable, DatasetProperties.EMPTY);
+
+    Table table = datasetFramework.getDataset(storeTable, ImmutableMap.<String, String>of(), null);
+    Assert.assertNotNull(table);
+    final AppMetadataStore metadataStoreDataset = new AppMetadataStore(table, cConf);
+    TransactionExecutor txnl = txExecutorFactory.createExecutor(
+      Collections.singleton((TransactionAware) metadataStoreDataset));
+
+    ApplicationId application = NamespaceId.DEFAULT.app("app");
+    final ProgramId program = application.program(ProgramType.values()[ProgramType.values().length - 1],
+                                                  "program");
+    final RunId runId = RunIds.generate();
+    txnl.execute(new TransactionExecutor.Subroutine() {
+      @Override
+      public void apply() throws Exception {
+        metadataStoreDataset.recordProgramStart(program, runId.getId(), RunIds.getTime(runId, TimeUnit.SECONDS),
+                                                null, null, null, true);
+      }
+    });
+
+    txnl.execute(new TransactionExecutor.Subroutine() {
+      @Override
+      public void apply() throws Exception {
+        Set<RunId> runIds = metadataStoreDataset.getRunningInRange(0, Long.MAX_VALUE);
+        Assert.assertEquals(1, runIds.size());
+        RunRecordMeta meta = metadataStoreDataset.getRun(program, runIds.iterator().next().getId());
+        Assert.assertNotNull(meta);
+        Assert.assertEquals(runId.getId(), meta.getPid());
+      }
+    });
+
+    txnl.execute(new TransactionExecutor.Subroutine() {
+      @Override
+      public void apply() throws Exception {
+        metadataStoreDataset.recordProgramStop(program, runId.getId(),
+                                               TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()),
+                                               ProgramRunStatus.COMPLETED, null, true);
+        Map<ProgramRunId, RunRecordMeta> runRecordMap = metadataStoreDataset.getRuns(
+          program, ProgramRunStatus.COMPLETED, 0, Long.MAX_VALUE, Integer.MAX_VALUE, null);
+        Assert.assertEquals(1, runRecordMap.size());
+        ProgramRunId programRunId = runRecordMap.keySet().iterator().next();
+        Assert.assertEquals(program, programRunId.getParent());
+        Assert.assertEquals(runId.getId(), programRunId.getRun());
+      }
+    });
+  }
+
+  @Test
   public void testScanRunningInRangeWithBatch() throws Exception {
     DatasetId storeTable = NamespaceId.DEFAULT.dataset("testScanRunningInRange");
     datasetFramework.addInstance(Table.class.getName(), storeTable, DatasetProperties.EMPTY);

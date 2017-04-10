@@ -1,5 +1,4 @@
 /*
-/*
  * Copyright © 2015-2017 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -116,7 +115,6 @@ public class UpgradeTool {
   private final DatasetUpgrader dsUpgrade;
   private final QueueAdmin queueAdmin;
   private final AuthorizationEnforcementService authorizationService;
-  private final DefaultStore store;
   private final HBaseTableFactory tmsTableFactory;
   private final CoprocessorManager coprocessorManager;
 
@@ -162,7 +160,6 @@ public class UpgradeTool {
     this.dsUpgrade = injector.getInstance(DatasetUpgrader.class);
     this.queueAdmin = injector.getInstance(QueueAdmin.class);
     this.authorizationService = injector.getInstance(AuthorizationEnforcementService.class);
-    this.store = injector.getInstance(DefaultStore.class);
     this.tmsTableFactory = injector.getInstance(HBaseTableFactory.class);
     LocationFactory locationFactory = injector.getInstance(LocationFactory.class);
     HBaseTableUtil tableUtil = injector.getInstance(HBaseTableUtil.class);
