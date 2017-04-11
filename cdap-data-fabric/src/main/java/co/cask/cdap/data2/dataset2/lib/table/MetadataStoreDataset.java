@@ -363,42 +363,4 @@ public class MetadataStoreDataset extends AbstractDataset {
     }
     return builder;
   }
-
-  /**
-   * Returns a ProgramId given the MDS key
-   *
-   * @param key the MDS key to be used
-   * @return ProgramId created from the MDS key
-   */
-  protected ProgramId getProgramID(MDSKey key) {
-    MDSKey.Splitter splitter = key.split();
-    List<String> splits = new ArrayList<>();
-
-    try {
-      while (true) {
-        splits.add(splitter.getString());
-      }
-    } catch (BufferUnderflowException ex) {
-      // Expected
-    }
-
-    String namespace = splits.get(1);
-    String application = splits.get(2);
-    String appVersion;
-    String type;
-    String program;
-
-    // New Format
-    if (splits.size() >= 6) {
-      appVersion = splits.get(3);
-      type = splits.get(4);
-      program = splits.get(5);
-    } else {
-      appVersion = ApplicationId.DEFAULT_VERSION;
-      type = splits.get(3);
-      program = splits.get(4);
-    }
-    return (new ApplicationId(namespace, application, appVersion).program(ProgramType.valueOf(type), program));
-  }
-
 }

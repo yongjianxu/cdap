@@ -66,8 +66,8 @@ public class DefaultSchedulerService {
       Trigger trigger = context.getTrigger();
       String key = trigger.getKey().getName();
       String[] parts = key.split(":");
-      Preconditions.checkArgument(parts.length == 6, "Trigger's key name {} has {} parts instead of 6",
-                                  key, parts.length);
+      Preconditions.checkArgument(parts.length == 6, String.format("Trigger's key name %s has %d parts instead of 6",
+                                  key, parts.length));
 
       String namespaceId = parts[0];
       String applicationId = parts[1];

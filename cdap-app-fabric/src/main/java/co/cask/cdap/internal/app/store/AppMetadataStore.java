@@ -1010,6 +1010,70 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
   }
 
+  /**
+   * Returns a ProgramId given the MDS key
+   *
+   * @param key the MDS key to be used
+   * @return ProgramId created from the MDS key
+   */
+  private ProgramId getProgramID(MDSKey key) {
+    MDSKey.Splitter splitter = key.split();
+
+    // Format : recordType, ns, app, <version>, type, program, <ts>, runid
+    // <version> -> might or might not be present based on whether the upgrade thread has changed the record
+    // <ts> -> will be present if the record type is runRecordComplete
+
+    String recordType = splitter.getString();
+    boolean offset = false;
+    if (recordType.equals(TYPE_RUN_RECORD_COMPLETED)) {
+      // If the record type is runRecordCompleted, then it will have <ts> field
+      offset = true;
+    }
+
+    String namespace = splitter.getString();
+    String application = splitter.getString();
+    String appVersion = ApplicationId.DEFAULT_VERSION;
+    String type;
+    String program;
+
+    List<String> splits = new ArrayList<>();
+    while (true) {
+      try {
+        splits.add(splitter.getString());
+      } catch (BufferUnderflowException ex) {
+        break;
+      }
+    }
+
+    if (offset) {
+      // two possibilities
+      // old format: [recordType, ns, app] type, program, <ts, runid>
+      if (splits.size() == 2) {
+        type = splits.get(0);
+        program = splits.get(1);
+      } else {
+        // new format: [recordType, ns, app] version, type, program, <ts, runid>
+        appVersion = splits.get(0);
+        type = splits.get(1);
+        program = splits.get(2);
+      }
+    } else {
+      // two possibilities
+      // old format : [recordType, ns, app] type, program, runid
+      if (splits.size() == 3) {
+        type = splits.get(0);
+        program = splits.get(1);
+      } else {
+        // new format : [recordType, ns, app] version, type, program, runid
+        appVersion = splits.get(0);
+        type = splits.get(1);
+        program = splits.get(2);
+      }
+    }
+
+    return (new ApplicationId(namespace, application, appVersion).program(ProgramType.valueOf(type), program));
+  }
+
   private static class ScanFunction implements Function<MetadataStoreDataset.KeyValue<RunRecordMeta>, Boolean> {
     private final Predicate<RunRecordMeta> filter;
     private final Stopwatch stopwatch;
