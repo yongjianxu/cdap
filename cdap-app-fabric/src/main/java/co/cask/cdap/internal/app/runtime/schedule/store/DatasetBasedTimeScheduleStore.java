@@ -437,25 +437,28 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     TriggerKey oldTriggerKey = oldTrigger.trigger.getKey();
     JobKey oldTriggerJobKey = oldTrigger.trigger.getJobKey();
 
-    String[] splits = oldTriggerJobKey.getName().split(":");
-    // Old TriggerKey name has format = namespace:application:type:program:schedule
-    if (splits.length != 5) {
-      return false;
-    }
-
+    String[] triggerSplits = oldTriggerJobKey.getName().split(":");
     String[] oldJobNameSplits = oldTriggerJobKey.getName().split(":");
+
+    // Old TriggerKey name has format = namespace:application:type:program:schedule
     // Old JobKey name has format = namespace:application:type:program
-    if (oldJobNameSplits.length != 4) {
+    if (triggerSplits.length != 5 && oldJobNameSplits.length != 4) {
       return false;
     }
 
-    // New TriggerKey name has format = namespace:application:version:type:program:schedule
-    String newTriggerName = getNameWithVersion(splits);
-    oldTrigger.trigger.setKey(new TriggerKey(newTriggerName, oldTriggerKey.getGroup()));
+    if (triggerSplits.length == 5) {
+      // This trigger key has the old format. So replace it with new format.
+      // New TriggerKey name has format = namespace:application:version:type:program:schedule
+      String newTriggerName = getNameWithVersion(triggerSplits);
+      oldTrigger.trigger.setKey(new TriggerKey(newTriggerName, oldTriggerKey.getGroup()));
+    }
 
-    // New JobKey name has format = namespace:application:version:type:program
-    String newJobName = getNameWithVersion(oldJobNameSplits);
-    oldTrigger.trigger.setJobKey(new JobKey(newJobName, oldTriggerJobKey.getGroup()));
+    if (oldJobNameSplits.length == 4) {
+      // This job key has the old format. So replace it with new format.
+      // New JobKey name has format = namespace:application:version:type:program
+      String newJobName = getNameWithVersion(oldJobNameSplits);
+      oldTrigger.trigger.setJobKey(new JobKey(newJobName, oldTriggerJobKey.getGroup()));
+    }
     return true;
   }
 
