@@ -437,7 +437,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     TriggerKey oldTriggerKey = oldTrigger.trigger.getKey();
     JobKey oldTriggerJobKey = oldTrigger.trigger.getJobKey();
 
-    String[] triggerSplits = oldTriggerJobKey.getName().split(":");
+    String[] triggerSplits = oldTriggerKey.getName().split(":");
     String[] oldJobNameSplits = oldTriggerJobKey.getName().split(":");
 
     // Old TriggerKey name has format = namespace:application:type:program:schedule
