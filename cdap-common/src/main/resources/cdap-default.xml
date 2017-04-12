@@ -422,6 +422,14 @@
   </property>
 
   <property>
+    <name>apps.update.schedules</name>
+    <value>true</value>
+    <description>
+      Enable if changes in schedules of an application can be updated on app redeploy.
+    </description>
+  </property>
+
+  <property>
     <name>master.services.bind.address</name>
     <value>0.0.0.0</value>
     <description>

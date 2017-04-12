@@ -114,6 +114,7 @@ public class AppLifecycleHttpHandler extends AbstractAppFabricHttpHandler {
   private final NamespacedLocationFactory namespacedLocationFactory;
   private final ApplicationLifecycleService applicationLifecycleService;
   private final File tmpDir;
+  private final boolean appUpdateSchedules;
 
   @Inject
   AppLifecycleHttpHandler(CConfiguration configuration,
@@ -129,6 +130,8 @@ public class AppLifecycleHttpHandler extends AbstractAppFabricHttpHandler {
     this.applicationLifecycleService = applicationLifecycleService;
     this.tmpDir = new File(new File(configuration.get(Constants.CFG_LOCAL_DATA_DIR)),
                            configuration.get(Constants.AppFabric.TEMP_DIR)).getAbsoluteFile();
+    this.appUpdateSchedules = configuration.getBoolean(Constants.AppFabric.APP_UPDATE_SCHEDULES,
+                                                       Constants.AppFabric.DEFAULT_APP_UPDATE_SCHEDULES);
   }
 
   /**
@@ -346,8 +349,11 @@ public class AppLifecycleHttpHandler extends AbstractAppFabricHttpHandler {
       throw new BadRequestException("Request body is invalid json: " + e.getMessage());
     }
 
+    boolean updateSchedules =
+      appRequest.canUpdateSchedules() == null ? appUpdateSchedules : appRequest.canUpdateSchedules();
+
     try {
-      applicationLifecycleService.updateApp(appId, appRequest, createProgramTerminator());
+      applicationLifecycleService.updateApp(appId, appRequest, createProgramTerminator(), updateSchedules);
       responder.sendString(HttpResponseStatus.OK, "Update complete.");
     } catch (InvalidArtifactException e) {
       throw new BadRequestException(e.getMessage());
@@ -376,6 +382,8 @@ public class AppLifecycleHttpHandler extends AbstractAppFabricHttpHandler {
         try (FileReader fileReader = new FileReader(uploadedFile)) {
 
           AppRequest<?> appRequest = GSON.fromJson(fileReader, AppRequest.class);
+          boolean updateSchedules =
+            appRequest.canUpdateSchedules() == null ? appUpdateSchedules : appRequest.canUpdateSchedules();
           ArtifactSummary artifactSummary = appRequest.getArtifact();
           NamespaceId artifactNamespace =
             ArtifactScope.SYSTEM.equals(artifactSummary.getScope()) ? NamespaceId.SYSTEM : appId.getParent();
@@ -389,7 +397,7 @@ public class AppLifecycleHttpHandler extends AbstractAppFabricHttpHandler {
           String configString = appRequest.getConfig() == null ? null : GSON.toJson(appRequest.getConfig());
           applicationLifecycleService.deployApp(appId.getParent(), appId.getApplication(), appId.getVersion(),
                                                 artifactId, configString, createProgramTerminator(), ownerPrincipalId,
-                                                appRequest.canUpdateSchedules());
+                                                updateSchedules);
           responder.sendString(HttpResponseStatus.OK, "Deploy Complete");
         } catch (ArtifactNotFoundException e) {
           responder.sendString(HttpResponseStatus.NOT_FOUND, e.getMessage());

@@ -298,7 +298,8 @@ ApplicationLifecycleService extends AbstractIdleService {
    *                   the actual exception
    */
   public ApplicationWithPrograms updateApp(ApplicationId appId, AppRequest appRequest,
-                                           ProgramTerminator programTerminator) throws Exception {
+                                           ProgramTerminator programTerminator,
+                                           boolean updateAppSchedules) throws Exception {
 
     // check that app exists
     ApplicationSpecification currentSpec = store.getApplication(appId);
@@ -348,7 +349,7 @@ ApplicationLifecycleService extends AbstractIdleService {
 
     Id.Artifact artifactId = Artifacts.toArtifactId(appId.getParent(), newArtifactId).toId();
     return deployApp(appId.getParent(), appId.getApplication(), null, artifactId, requestedConfigStr,
-                     programTerminator, ownerAdmin.getOwner(appId), appRequest.canUpdateSchedules());
+                     programTerminator, ownerAdmin.getOwner(appId), updateAppSchedules);
   }
 
   /**
