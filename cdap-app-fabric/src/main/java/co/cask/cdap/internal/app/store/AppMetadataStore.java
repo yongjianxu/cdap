@@ -225,7 +225,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
     List<WorkflowNodeStateDetail> nodeStateDetails = list(key, WorkflowNodeStateDetail.class);
 
     // Check again without the version to account for old data format since they might not have been updated yet
-    // Since all the programs needs to be stopped before upgrade, either we will have node state details for
+    // Since all the programs needs to be stopped before upgrade tool is run, either we will have node state details for
     // one specific run-id either in the old format or in the new format.
     if (nodeStateDetails.isEmpty() && workflowRunId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
       key = getVersionLessProgramKeyBuilder(TYPE_WORKFLOW_NODE_STATE, workflowRunId.getParent())
@@ -355,6 +355,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
       throw new IllegalArgumentException(msg);
     }
 
+    // Since the key contains the RunId/PID in addition to the programId, it is ok to deleteAll.
     deleteAll(key);
 
     key = getProgramKeyBuilder(toType, programId)
@@ -397,10 +398,12 @@ public class AppMetadataStore extends MetadataStoreDataset {
       addWorkflowNodeState(programId, pid, started.getSystemArgs(), runStatus, failureCause);
     }
 
+    // Since the key contains the RunId/PID in addition to the programId, it is ok to deleteAll.
     deleteAll(key);
 
     MDSKey.Builder builder;
     if (versionLess) {
+      // Only for testing purpose
       builder = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId);
     } else {
       builder = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId);
@@ -1065,11 +1068,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
     // <ts> -> will be present if the record type is runRecordComplete
 
     String recordType = splitter.getString();
-    boolean offset = false;
-    if (recordType.equals(TYPE_RUN_RECORD_COMPLETED)) {
-      // If the record type is runRecordCompleted, then it will have <ts> field
-      offset = true;
-    }
+    int oldFormatSplitSize = recordType.equals(TYPE_RUN_RECORD_COMPLETED) ? 2 : 3;
 
     String namespace = splitter.getString();
     String application = splitter.getString();
@@ -1086,10 +1085,11 @@ public class AppMetadataStore extends MetadataStoreDataset {
       }
     }
 
-    if (offset) {
+    if (recordType.equals(TYPE_RUN_RECORD_COMPLETED)) {
+      // If the record type is runRecordCompleted, then it will have <ts> field
       // two possibilities
       // old format: [recordType, ns, app] type, program, <ts, runid>
-      if (splits.size() == 2) {
+      if (splits.size() == oldFormatSplitSize) {
         type = splits.get(0);
         program = splits.get(1);
       } else {
@@ -1101,7 +1101,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
     } else {
       // two possibilities
       // old format : [recordType, ns, app] type, program, runid
-      if (splits.size() == 3) {
+      if (splits.size() == oldFormatSplitSize) {
         type = splits.get(0);
         program = splits.get(1);
       } else {
