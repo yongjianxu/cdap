@@ -25,8 +25,6 @@ import co.cask.cdap.api.dataset.table.Scan;
 import co.cask.cdap.api.dataset.table.Scanner;
 import co.cask.cdap.api.dataset.table.Table;
 import co.cask.cdap.common.utils.ImmutablePair;
-import co.cask.cdap.proto.ProgramType;
-import co.cask.cdap.proto.id.ApplicationId;
 import co.cask.cdap.proto.id.ProgramId;
 import co.cask.cdap.proto.id.ProgramRunId;
 import com.google.common.base.Function;
@@ -38,7 +36,6 @@ import com.google.common.collect.Maps;
 import com.google.gson.Gson;
 
 import java.lang.reflect.Type;
-import java.nio.BufferUnderflowException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -285,6 +282,11 @@ public class MetadataStoreDataset extends AbstractDataset {
     public T getValue() {
       return value;
     }
+  }
+
+  public void delete(MDSKey id) {
+    byte[] key = id.getKey();
+    table.delete(key);
   }
 
   public void deleteAll(MDSKey id) {

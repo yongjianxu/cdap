@@ -162,6 +162,14 @@ public class AppMetadataStore extends MetadataStoreDataset {
   }
 
   public void deleteApplication(String namespaceId, String appId, String versionId) {
+    if (versionId.equals(ApplicationId.DEFAULT_VERSION)) {
+      MDSKey mdsKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
+      ApplicationMeta appMeta = get(mdsKey, ApplicationMeta.class);
+      // If app meta exists for the application without a version, delete only that key.
+      if (appMeta != null) {
+        delete(mdsKey);
+      }
+    }
     deleteAll(new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId, versionId).build());
   }
 
@@ -724,15 +732,33 @@ public class AppMetadataStore extends MetadataStoreDataset {
   }
 
   public void deleteProgramHistory(String namespaceId, String appId, String versionId) {
+    Map<MDSKey, RunRecordMeta> runRecords;
     if (versionId.equals(ApplicationId.DEFAULT_VERSION)) {
-      deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId).build());
-      deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_COMPLETED, namespaceId, appId).build());
-      deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId).build());
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId).build(),
+                          RunRecordMeta.class);
+      deleteDefaultVersionRecords(runRecords.keySet());
+
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_COMPLETED, namespaceId, appId).build(),
+                          RunRecordMeta.class);
+      deleteDefaultVersionRecords(runRecords.keySet());
+
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId).build(),
+                          RunRecordMeta.class);
+      deleteDefaultVersionRecords(runRecords.keySet());
     }
 
     deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId, versionId).build());
     deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_COMPLETED, namespaceId, appId, versionId).build());
     deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId, versionId).build());
+  }
+
+  private void deleteDefaultVersionRecords(Set<MDSKey> keys) {
+    for (MDSKey key : keys) {
+      ProgramId programId = getProgramID(key);
+      if (programId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
+        delete(key);
+      }
+    }
   }
 
   public void deleteProgramHistory(String namespaceId) {
