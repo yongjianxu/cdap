@@ -432,6 +432,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
     }
 
     final AtomicBoolean upgradeComplete = new AtomicBoolean(false);
+    initializeScheduleTable();
     try {
       factory.createExecutor(ImmutableList.of((TransactionAware) table))
         .execute(new TransactionExecutor.Subroutine() {
@@ -456,6 +457,7 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
 
     // If upgrade is already complete, then simply return.
     if (upgradeComplete.get()) {
+      LOG.info("TimeScheduleStore is already upgraded.");
       return;
     }
 
@@ -473,7 +475,6 @@ public class DatasetBasedTimeScheduleStore extends RAMJobStore {
               // Upgrade is complete. Mark that app version upgrade is complete in the table.
               table.put(APP_VERSION_UPGRADE_KEY, Bytes.toBytes('c'),
                         Bytes.toBytes(ProjectInfo.getVersion().toString()));
-
             }
           });
       } catch (TransactionFailureException e) {

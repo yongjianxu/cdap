@@ -936,6 +936,7 @@ public class DefaultStore implements Store {
 
     // If upgrade is already complete, then simply return.
     if (upgradeComplete.get()) {
+      LOG.info("TimeScheduleStore is already upgraded.");
       return;
     }
 
@@ -1181,6 +1182,13 @@ public class DefaultStore implements Store {
     public void run() {
       while (!flag.get()) {
         try {
+          TimeUnit.MINUTES.sleep(5);
+        } catch (InterruptedException e) {
+          LOG.debug("Received an interrupt.", e);
+          Thread.currentThread().interrupt();
+        }
+
+        try {
           Transactions.execute(transactional, new TxCallable<Void>() {
             @Override
             public Void call(DatasetContext context) throws Exception {
@@ -1196,13 +1204,6 @@ public class DefaultStore implements Store {
           });
         } catch (TransactionFailureException ex) {
           LOG.debug("Received an exception while trying to read the upgrade flag entry. Will retry in sometime.", ex);
-        }
-
-        try {
-          TimeUnit.MINUTES.sleep(5);
-        } catch (InterruptedException e) {
-          LOG.debug("Received an interrupt.", e);
-          Thread.currentThread().interrupt();
         }
       }
     }

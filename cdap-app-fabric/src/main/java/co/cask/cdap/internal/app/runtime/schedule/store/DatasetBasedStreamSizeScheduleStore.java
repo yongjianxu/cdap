@@ -420,6 +420,7 @@ public class DatasetBasedStreamSizeScheduleStore {
 
     // If upgrade is already complete, then simply return.
     if (upgradeComplete.get()) {
+      LOG.info("StreamSizeScheduleStore is already upgraded.");
       return;
     }
 

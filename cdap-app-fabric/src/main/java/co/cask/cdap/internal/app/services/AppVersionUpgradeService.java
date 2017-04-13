@@ -16,7 +16,6 @@
 
 package co.cask.cdap.internal.app.services;
 
-import co.cask.cdap.api.dataset.DatasetManagementException;
 import co.cask.cdap.internal.app.runtime.schedule.store.DatasetBasedStreamSizeScheduleStore;
 import co.cask.cdap.internal.app.runtime.schedule.store.DatasetBasedTimeScheduleStore;
 import co.cask.cdap.internal.app.store.DefaultStore;
@@ -27,7 +26,6 @@ import org.apache.twill.common.Threads;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -63,7 +61,7 @@ public class AppVersionUpgradeService extends AbstractIdleService {
       public void run() {
         try {
           streamSizeScheduleStore.upgrade();
-        } catch (InterruptedException | IOException | DatasetManagementException e) {
+        } catch (Exception e) {
           LOG.debug("StreamSizeScheduleStore upgrade failed.", e);
         }
       }
@@ -73,7 +71,7 @@ public class AppVersionUpgradeService extends AbstractIdleService {
       public void run() {
         try {
           timeScheduleStore.upgrade();
-        } catch (InterruptedException | IOException | DatasetManagementException e) {
+        } catch (Exception e) {
           LOG.debug("TimeScheduleStore upgrade failed.", e);
         }
       }
@@ -83,7 +81,7 @@ public class AppVersionUpgradeService extends AbstractIdleService {
       public void run() {
         try {
           defaultStore.upgrade();
-        } catch (InterruptedException | IOException | DatasetManagementException e) {
+        } catch (Exception e) {
           LOG.debug("DefaultStore upgrade failed.", e);
         }
       }
