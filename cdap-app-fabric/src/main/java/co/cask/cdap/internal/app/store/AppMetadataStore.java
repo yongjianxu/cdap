@@ -1056,8 +1056,6 @@ public class AppMetadataStore extends MetadataStoreDataset {
     // <ts> -> will be present if the record type is runRecordComplete
 
     String recordType = splitter.getString();
-    int oldFormatSplitSize = recordType.equals(TYPE_RUN_RECORD_COMPLETED) ? 2 : 3;
-
     String namespace = splitter.getString();
     String application = splitter.getString();
     String appVersion = ApplicationId.DEFAULT_VERSION;
@@ -1077,7 +1075,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
       // If the record type is runRecordCompleted, then it will have <ts> field
       // two possibilities
       // old format: [recordType, ns, app] type, program, <ts, runid>
-      if (splits.size() == oldFormatSplitSize) {
+      if (splits.size() == 2) {
         type = splits.get(0);
         program = splits.get(1);
       } else {
@@ -1089,7 +1087,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
     } else {
       // two possibilities
       // old format : [recordType, ns, app] type, program, runid
-      if (splits.size() == oldFormatSplitSize) {
+      if (splits.size() == 3) {
         type = splits.get(0);
         program = splits.get(1);
       } else {
