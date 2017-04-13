@@ -21,19 +21,28 @@ import co.cask.cdap.api.common.Bytes;
 import co.cask.cdap.api.data.schema.Schema;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TimeZone;
+import javax.annotation.Nullable;
 
 /**
  * Instance of a record structured by a {@link Schema}. Fields are accessible by name.
  */
 @Beta
 public class StructuredRecord implements Serializable {
+  private static final SimpleDateFormat DEFAULT_FORMAT = new SimpleDateFormat("YYYY-MM-DD'T'HH:mm:ss z");
   private final Schema schema;
   private final Map<String, Object> fields;
 
   private static final long serialVersionUID = -4648752378975451591L;
+
+  {
+    DEFAULT_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+  }
 
   private StructuredRecord(Schema schema, Map<String, Object> fields) {
     this.schema = schema;
@@ -97,9 +106,55 @@ public class StructuredRecord implements Serializable {
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
      *                                   value is given.
      */
-    public Builder set(String fieldName, Object value) {
+    public Builder set(String fieldName, @Nullable Object value) {
       validateAndGetField(fieldName, value);
       fields.put(fieldName, value);
+      return this;
+    }
+
+    /**
+     * Convert the given date into the type of the given field, and set the value for that field.
+     * A Date can be converted into a long or a string.
+     *
+     * @param fieldName Name of the field to set.
+     * @param date Date value for the field.
+     * @return This builder.
+     * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
+     *                                   value is given, or the date cannot be converted to the type for the field.
+     */
+    public Builder convertAndSet(String fieldName, @Nullable Date date) throws UnexpectedFormatException {
+      return convertAndSet(fieldName, date, DEFAULT_FORMAT);
+    }
+
+    /**
+     * Convert the given date into the type of the given field, and set the value for that field.
+     * A Date can be converted into a long or a string.
+     *
+     * @param fieldName Name of the field to set.
+     * @param date Date value for the field.
+     * @param dateFormat Format for the date if it is a string. If null, a default format will be used.
+     * @return This builder.
+     * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
+     *                                   value is given, or the date cannot be converted to the type for the field.
+     */
+    public Builder convertAndSet(String fieldName, @Nullable Date date,
+                                 @Nullable SimpleDateFormat dateFormat) throws UnexpectedFormatException {
+      Schema.Field field = validateAndGetField(fieldName, date);
+      boolean isNullable = field.getSchema().isNullable();
+      if (isNullable && date == null) {
+        fields.put(fieldName, null);
+        return this;
+      }
+
+      Schema.Type fieldType = isNullable ? field.getSchema().getNonNullable().getType() : field.getSchema().getType();
+      if (fieldType == Schema.Type.LONG) {
+        fields.put(fieldName, date.getTime());
+      } else if (fieldType == Schema.Type.STRING) {
+        SimpleDateFormat format = dateFormat == null ? DEFAULT_FORMAT : dateFormat;
+        fields.put(fieldName, format.format(date));
+      } else {
+        throw new UnexpectedFormatException("Date must be either a long or a string, not a " + fieldType);
+      }
       return this;
     }
 
@@ -113,7 +168,7 @@ public class StructuredRecord implements Serializable {
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
      *                                   value is given, or the string cannot be converted to the type for the field.
      */
-    public Builder convertAndSet(String fieldName, String strVal) throws UnexpectedFormatException {
+    public Builder convertAndSet(String fieldName, @Nullable String strVal) throws UnexpectedFormatException {
       Schema.Field field = validateAndGetField(fieldName, strVal);
       fields.put(fieldName, convertString(field.getSchema(), strVal));
       return this;
