@@ -936,7 +936,7 @@ public class DefaultStore implements Store {
 
     // If upgrade is already complete, then simply return.
     if (upgradeComplete.get()) {
-      LOG.info("TimeScheduleStore is already upgraded.");
+      LOG.info("DefaultStore is already upgraded.");
       return;
     }
 
