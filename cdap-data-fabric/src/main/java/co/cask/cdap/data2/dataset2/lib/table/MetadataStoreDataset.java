@@ -156,40 +156,55 @@ public class MetadataStoreDataset extends AbstractDataset {
   // returns mapping of all that has first id parts in range of startId and stopId
   public <T> Map<MDSKey, T> listKV(MDSKey startId, @Nullable MDSKey stopId, Type typeOfT, int limit,
                                    Predicate<T> filter) {
+    return listKV(startId, stopId, typeOfT, limit, null, filter);
+  }
+
+  public <T> Map<MDSKey, T> listKV(MDSKey startId, @Nullable MDSKey stopId, Type typeOfT, int limit,
+                                   Predicate<MDSKey> keyFilter, Predicate<T> valueFilter) {
     byte[] startKey = startId.getKey();
     byte[] stopKey = stopId == null ? Bytes.stopKeyForPrefix(startKey) : stopId.getKey();
 
     Scan scan = new Scan(startKey, stopKey);
-    return listKV(scan, typeOfT, limit, filter);
+    return listKV(scan, typeOfT, limit, keyFilter, valueFilter);
   }
 
-  // returns mapping of all that has first id parts in range of startId and stopId
-  private <T> Map<MDSKey, T> listKV(Scan runScan, Type typeOfT, int limit, Predicate<T> filter) {
+  private <T> Map<MDSKey, T> listKV(Scan runScan, Type typeOfT, int limit, @Nullable Predicate<MDSKey> keyFilter,
+                                    @Nullable Predicate<T> valueFilter) {
     try {
       Map<MDSKey, T> map = Maps.newLinkedHashMap();
-      Scanner scan = table.scan(runScan);
-      try {
+      try (Scanner scan = table.scan(runScan)) {
         Row next;
         while ((limit > 0) && (next = scan.next()) != null) {
+          MDSKey key = new MDSKey(next.getRow());
           byte[] columnValue = next.get(COLUMN);
           if (columnValue == null) {
             continue;
           }
           T value = deserialize(columnValue, typeOfT);
 
-          if (filter.apply(value)) {
-            MDSKey key = new MDSKey(next.getRow());
-            map.put(key, value);
-            --limit;
+          // Key Filter doesn't pass
+          if (keyFilter != null && !keyFilter.apply(key)) {
+            continue;
           }
+
+          // If Value Filter doesn't pass
+          if (valueFilter != null && !valueFilter.apply(value)) {
+            continue;
+          }
+
+          map.put(key, value);
+          limit--;
         }
         return map;
-      } finally {
-        scan.close();
       }
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
+  }
+
+  // returns mapping of all that has first id parts in range of startId and stopId
+  private <T> Map<MDSKey, T> listKV(Scan runScan, Type typeOfT, int limit, Predicate<T> filter) {
+    return listKV(runScan, typeOfT, limit, null, filter);
   }
 
   // TODO: We should avoid this duplicate code. CDAP-7569.

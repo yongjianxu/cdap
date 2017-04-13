@@ -539,8 +539,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
   private Map<ProgramRunId, RunRecordMeta> getNonCompleteRuns(@Nullable ProgramId programId, String recordType,
                                                               final long startTime, final long endTime, int limit,
                                                               Predicate<RunRecordMeta> filter) {
-    MDSKey activeKey = getProgramKeyBuilder(recordType, programId).build();
-    Predicate<RunRecordMeta> finalPredicate = andPredicate(new Predicate<RunRecordMeta>() {
+    Map<MDSKey, RunRecordMeta> runRecordMap;
+    Predicate<RunRecordMeta> valuePredicate = andPredicate(new Predicate<RunRecordMeta>() {
 
       @Override
       public boolean apply(RunRecordMeta input) {
@@ -548,27 +548,22 @@ public class AppMetadataStore extends MetadataStoreDataset {
       }
     }, filter);
 
-    Map<MDSKey, RunRecordMeta> runRecordMap = listKV(activeKey, null, RunRecordMeta.class, limit, finalPredicate);
-    Map<ProgramRunId, RunRecordMeta> programRunIdRunRecordMetaMap = getProgramRunIdMap(runRecordMap);
+    if (programId == null || !programId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
+      MDSKey key = getProgramKeyBuilder(recordType, programId).build();
+      runRecordMap = listKV(key, null, RunRecordMeta.class, limit, valuePredicate);
+    } else {
+      MDSKey key = getVersionLessProgramKeyBuilder(recordType, programId).build();
+      Predicate<MDSKey> keyPredicate = new Predicate<MDSKey>() {
 
-    int remaining = limit - programRunIdRunRecordMetaMap.size();
-    if (programId != null && programId.getVersion().equals(ApplicationId.DEFAULT_VERSION) && (remaining > 0)) {
-      activeKey = getVersionLessProgramKeyBuilder(recordType, programId).build();
-      runRecordMap = listKV(activeKey, null, RunRecordMeta.class, remaining, finalPredicate);
-      Map<ProgramRunId, RunRecordMeta> oldRunRecordMetaMap = getProgramRunIdMap(runRecordMap);
-
-      for (Map.Entry<ProgramRunId, RunRecordMeta> oldFormatEntry : oldRunRecordMetaMap.entrySet()) {
-        // Skip the record if it is present in the new format
-        if (programRunIdRunRecordMetaMap.keySet().contains(oldFormatEntry.getKey())) {
-          continue;
+        @Override
+        public boolean apply(MDSKey input) {
+          ProgramId id = getProgramID(input);
+          return id.getVersion().equals(ApplicationId.DEFAULT_VERSION);
         }
-        programRunIdRunRecordMetaMap.put(oldFormatEntry.getKey(), oldFormatEntry.getValue());
-        if (programRunIdRunRecordMetaMap.size() >= limit) {
-          break;
-        }
-      }
+      };
+      runRecordMap = listKV(key, null, RunRecordMeta.class, limit, keyPredicate, valuePredicate);
     }
-    return programRunIdRunRecordMetaMap;
+    return getProgramRunIdMap(runRecordMap);
   }
 
   private Map<ProgramRunId, RunRecordMeta> getSuspendedRuns(Set<ProgramRunId> programRunIds, int limit) {
@@ -651,51 +646,44 @@ public class AppMetadataStore extends MetadataStoreDataset {
   private Map<ProgramRunId, RunRecordMeta> getHistoricalRuns(@Nullable ProgramId programId, ProgramRunStatus status,
                                                              final long startTime, final long endTime, int limit,
                                                              @Nullable Predicate<RunRecordMeta> filter) {
-    MDSKey historyKey = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
-    Map<ProgramRunId, RunRecordMeta> programRunIdRunRecordMetaMap = getHistoricalRuns(historyKey, status, startTime,
-                                                                                      endTime, limit, filter);
-
-    int remaining = limit - programRunIdRunRecordMetaMap.size();
-    if (programId != null && programId.getVersion().equals(ApplicationId.DEFAULT_VERSION) && (remaining > 0)) {
-      historyKey = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
-      Map<ProgramRunId, RunRecordMeta> oldRunRecordMetaMap = getHistoricalRuns(historyKey, status, startTime, endTime,
-                                                                               limit, filter);
-
-      for (Map.Entry<ProgramRunId, RunRecordMeta> oldFormatEntry : oldRunRecordMetaMap.entrySet()) {
-        // Skip the record if it is present in the new format
-        if (programRunIdRunRecordMetaMap.keySet().contains(oldFormatEntry.getKey())) {
-          continue;
-        }
-        programRunIdRunRecordMetaMap.put(oldFormatEntry.getKey(), oldFormatEntry.getValue());
-        if (programRunIdRunRecordMetaMap.size() >= limit) {
-          break;
-        }
-      }
+    if (programId == null || !programId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
+      MDSKey key = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
+      return getHistoricalRuns(key, status, startTime, endTime, limit, null, filter);
     }
-    return programRunIdRunRecordMetaMap;
+
+    MDSKey key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
+    Predicate<MDSKey> keyPredicate = new Predicate<MDSKey>() {
+      @Override
+      public boolean apply(MDSKey input) {
+        ProgramId id = getProgramID(input);
+        return id.getVersion().equals(ApplicationId.DEFAULT_VERSION);
+      }
+    };
+    return getHistoricalRuns(key, status, startTime, endTime, limit, keyPredicate, filter);
   }
 
   private Map<ProgramRunId, RunRecordMeta> getHistoricalRuns(MDSKey historyKey, ProgramRunStatus status,
                                                              final long startTime, final long endTime, int limit,
-                                                             @Nullable Predicate<RunRecordMeta> filter) {
+                                                             @Nullable Predicate<MDSKey> keyFiter,
+                                                             @Nullable Predicate<RunRecordMeta> valueFilter) {
     MDSKey start = new MDSKey.Builder(historyKey).add(getInvertedTsScanKeyPart(endTime)).build();
     MDSKey stop = new MDSKey.Builder(historyKey).add(getInvertedTsScanKeyPart(startTime)).build();
     if (status.equals(ProgramRunStatus.ALL)) {
       //return all records (successful and failed)
-      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit,
-                                       filter == null ? Predicates.<RunRecordMeta>alwaysTrue() : filter));
+      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit, keyFiter,
+                                       valueFilter == null ? Predicates.<RunRecordMeta>alwaysTrue() : valueFilter));
     }
 
     if (status.equals(ProgramRunStatus.COMPLETED)) {
-      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit,
-                                       andPredicate(getPredicate(ProgramController.State.COMPLETED), filter)));
+      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit, keyFiter,
+                                       andPredicate(getPredicate(ProgramController.State.COMPLETED), valueFilter)));
     }
     if (status.equals(ProgramRunStatus.KILLED)) {
-      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit,
-                                       andPredicate(getPredicate(ProgramController.State.KILLED), filter)));
+      return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit, keyFiter,
+                                       andPredicate(getPredicate(ProgramController.State.KILLED), valueFilter)));
     }
-    return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit,
-                                     andPredicate(getPredicate(ProgramController.State.ERROR), filter)));
+    return getProgramRunIdMap(listKV(start, stop, RunRecordMeta.class, limit, keyFiter,
+                                     andPredicate(getPredicate(ProgramController.State.ERROR), valueFilter)));
   }
 
   private Predicate<RunRecordMeta> getPredicate(final ProgramController.State state) {
