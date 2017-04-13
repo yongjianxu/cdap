@@ -196,7 +196,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
     // Check again without the version to account for old data format if might not have been upgraded yet
     if (existing == null && (versionId.equals(ApplicationId.DEFAULT_VERSION))) {
       versionLessKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
-      existing = getFirst(versionLessKey, ApplicationMeta.class);
+      existing = get(versionLessKey, ApplicationMeta.class);
     }
 
     if (existing == null) {
@@ -553,15 +553,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
       runRecordMap = listKV(key, null, RunRecordMeta.class, limit, valuePredicate);
     } else {
       MDSKey key = getVersionLessProgramKeyBuilder(recordType, programId).build();
-      Predicate<MDSKey> keyPredicate = new Predicate<MDSKey>() {
-
-        @Override
-        public boolean apply(MDSKey input) {
-          ProgramId id = getProgramID(input);
-          return id.getVersion().equals(ApplicationId.DEFAULT_VERSION);
-        }
-      };
-      runRecordMap = listKV(key, null, RunRecordMeta.class, limit, keyPredicate, valuePredicate);
+      runRecordMap = listKV(key, null, RunRecordMeta.class, limit,
+                            new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), valuePredicate);
     }
     return getProgramRunIdMap(runRecordMap);
   }
@@ -653,14 +646,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
 
     MDSKey key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
-    Predicate<MDSKey> keyPredicate = new Predicate<MDSKey>() {
-      @Override
-      public boolean apply(MDSKey input) {
-        ProgramId id = getProgramID(input);
-        return id.getVersion().equals(ApplicationId.DEFAULT_VERSION);
-      }
-    };
-    return getHistoricalRuns(key, status, startTime, endTime, limit, keyPredicate, filter);
+    return getHistoricalRuns(key, status, startTime, endTime, limit,
+                             new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), filter);
   }
 
   private Map<ProgramRunId, RunRecordMeta> getHistoricalRuns(MDSKey historyKey, ProgramRunStatus status,
@@ -741,17 +728,18 @@ public class AppMetadataStore extends MetadataStoreDataset {
   public void deleteProgramHistory(String namespaceId, String appId, String versionId) {
     Map<MDSKey, RunRecordMeta> runRecords;
     if (versionId.equals(ApplicationId.DEFAULT_VERSION)) {
-      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId).build(),
-                          RunRecordMeta.class);
-      deleteDefaultVersionRecords(runRecords.keySet());
+      Predicate<MDSKey> keyPredicate = new AppVersionPredicate(ApplicationId.DEFAULT_VERSION);
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId).build(), null,
+                          RunRecordMeta.class, Integer.MAX_VALUE, keyPredicate, null);
+      deleteKeys(runRecords.keySet());
 
-      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_COMPLETED, namespaceId, appId).build(),
-                          RunRecordMeta.class);
-      deleteDefaultVersionRecords(runRecords.keySet());
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_COMPLETED, namespaceId, appId).build(), null,
+                          RunRecordMeta.class, Integer.MAX_VALUE, keyPredicate, null);
+      deleteKeys(runRecords.keySet());
 
-      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId).build(),
-                          RunRecordMeta.class);
-      deleteDefaultVersionRecords(runRecords.keySet());
+      runRecords = listKV(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId).build(), null,
+                          RunRecordMeta.class, Integer.MAX_VALUE, keyPredicate, null);
+      deleteKeys(runRecords.keySet());
     }
 
     deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_STARTED, namespaceId, appId, versionId).build());
@@ -759,12 +747,9 @@ public class AppMetadataStore extends MetadataStoreDataset {
     deleteAll(new MDSKey.Builder().add(TYPE_RUN_RECORD_SUSPENDED, namespaceId, appId, versionId).build());
   }
 
-  private void deleteDefaultVersionRecords(Set<MDSKey> keys) {
+  private void deleteKeys(Set<MDSKey> keys) {
     for (MDSKey key : keys) {
-      ProgramId programId = getProgramID(key);
-      if (programId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
-        delete(key);
-      }
+      delete(key);
     }
   }
 
@@ -1049,7 +1034,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
    * @param key the MDS key to be used
    * @return ProgramId created from the MDS key
    */
-  private ProgramId getProgramID(MDSKey key) {
+  private static ProgramId getProgramID(MDSKey key) {
     MDSKey.Splitter splitter = key.split();
 
     // Format : recordType, ns, app, <version>, type, program, <ts>, runid
@@ -1100,6 +1085,20 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
 
     return (new ApplicationId(namespace, application, appVersion).program(ProgramType.valueOf(type), program));
+  }
+
+  private static class AppVersionPredicate implements Predicate<MDSKey> {
+    private final String version;
+
+    AppVersionPredicate(String version) {
+      this.version = version;
+    }
+
+    @Override
+    public boolean apply(MDSKey input) {
+      ProgramId programId = getProgramID(input);
+      return programId.getVersion().equals(version);
+    }
   }
 
   private static class ScanFunction implements Function<MetadataStoreDataset.KeyValue<RunRecordMeta>, Boolean> {
