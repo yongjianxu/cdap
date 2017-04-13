@@ -590,7 +590,8 @@ public class AppMetadataStore extends MetadataStoreDataset {
     Set<ProgramRunId> candidateSet = Sets.newHashSet(programRunIdRunRecordMetaMap.keySet());
     for (ProgramRunId programRunId : candidateSet) {
       if (!programRunIds.contains(programRunId)) {
-        // If the program run id, doesn't match with the requested set, remove it.
+        // If the program run id, doesn't match with the requested set, remove it. This might happen
+        // getProgramKeyBuilder doesn't include the runid of the program.
         programRunIdRunRecordMetaMap.remove(programRunId);
       } else {
         // If the program run id was found, remove it from the request set.
