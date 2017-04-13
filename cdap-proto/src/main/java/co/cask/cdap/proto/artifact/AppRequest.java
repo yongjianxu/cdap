@@ -32,7 +32,7 @@ public class AppRequest<T> {
   private final PreviewConfig preview;
   @SerializedName("principal")
   private final String ownerPrincipal;
-  @SerializedName("app.update.schedules")
+  @SerializedName("app.deploy.update.schedules")
   private final Boolean updateSchedules;
 
 

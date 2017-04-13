@@ -27,7 +27,6 @@ public class AppRequestTest {
    */
   @Test
   public void testAppRequestDeserialize() throws Exception {
-
     String appRequestWithSchedules = "{\n" +
       "  \"artifact\": {\n" +
       "     \"name\": \"cdap-notifiable-workflow\",\n" +
@@ -55,7 +54,7 @@ public class AppRequestTest {
       "    \"programType\" : \"spark\"\n" +
       "    },\n" +
       "  \"principal\" : \"test2\",\n" +
-      "  \"app.update.schedules\":\"false\"\n" +
+      "  \"app.deploy.update.schedules\":\"false\"\n" +
       "}";
     AppRequest appRequest = GSON.fromJson(appRequestWithSchedules, AppRequest.class);
     Assert.assertNotNull(appRequest.getArtifact());

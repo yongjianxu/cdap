@@ -217,7 +217,7 @@ public final class Constants {
      */
     public static final String PROGRAM_CONTAINER_DIST_JARS = "program.container.dist.jars";
 
-    public static final String APP_UPDATE_SCHEDULES = "app.update.schedules";
+    public static final String APP_UPDATE_SCHEDULES = "app.deploy.update.schedules";
   }
 
   /**

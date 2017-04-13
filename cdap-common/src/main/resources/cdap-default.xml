@@ -422,10 +422,14 @@
   </property>
 
   <property>
-    <name>apps.update.schedules</name>
+    <name>app.deploy.update.schedules</name>
     <value>true</value>
     <description>
-      Enable if changes in schedules of an application can be updated on app redeploy.
+      If true, redeploying an application will modify any schedules that currently exist
+      for the application; if false, redeploying an application does not create any new
+      schedules and existing schedules are neither deleted nor updated. This property only
+      affects the redeployment of an application; all related actions or endpoints are
+      unaffected.
     </description>
   </property>
 
