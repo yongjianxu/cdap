@@ -21,6 +21,7 @@ import co.cask.cdap.api.common.Bytes;
 import co.cask.cdap.api.data.schema.Schema;
 
 import java.io.Serializable;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -100,11 +101,11 @@ public class StructuredRecord implements Serializable {
     /**
      * Set the field to the given value.
      *
-     * @param fieldName Name of the field to set.
-     * @param value Value for the field.
-     * @return This builder.
+     * @param fieldName Name of the field to set
+     * @param value Value for the field
+     * @return This builder
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
-     *                                   value is given.
+     *                                   value is given
      */
     public Builder set(String fieldName, @Nullable Object value) {
       validateAndGetField(fieldName, value);
@@ -116,11 +117,11 @@ public class StructuredRecord implements Serializable {
      * Convert the given date into the type of the given field, and set the value for that field.
      * A Date can be converted into a long or a string.
      *
-     * @param fieldName Name of the field to set.
-     * @param date Date value for the field.
-     * @return This builder.
+     * @param fieldName Name of the field to set
+     * @param date Date value for the field
+     * @return This builder
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
-     *                                   value is given, or the date cannot be converted to the type for the field.
+     *                                   value is given, or the date cannot be converted to the type for the field
      */
     public Builder convertAndSet(String fieldName, @Nullable Date date) throws UnexpectedFormatException {
       return convertAndSet(fieldName, date, DEFAULT_FORMAT);
@@ -128,17 +129,17 @@ public class StructuredRecord implements Serializable {
 
     /**
      * Convert the given date into the type of the given field, and set the value for that field.
-     * A Date can be converted into a long or a string.
+     * A Date can be converted into a long or a string, using a date format, if supplied.
      *
-     * @param fieldName Name of the field to set.
-     * @param date Date value for the field.
-     * @param dateFormat Format for the date if it is a string. If null, a default format will be used.
-     * @return This builder.
+     * @param fieldName Name of the field to set
+     * @param date Date value for the field
+     * @param dateFormat Format for the date if it is a string. If null, a default format will be used
+     * @return This builder
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
-     *                                   value is given, or the date cannot be converted to the type for the field.
+     *                                   value is given, or the date cannot be converted to the type for the field
      */
     public Builder convertAndSet(String fieldName, @Nullable Date date,
-                                 @Nullable SimpleDateFormat dateFormat) throws UnexpectedFormatException {
+                                 @Nullable DateFormat dateFormat) throws UnexpectedFormatException {
       Schema.Field field = validateAndGetField(fieldName, date);
       boolean isNullable = field.getSchema().isNullable();
       if (isNullable && date == null) {
@@ -150,7 +151,7 @@ public class StructuredRecord implements Serializable {
       if (fieldType == Schema.Type.LONG) {
         fields.put(fieldName, date.getTime());
       } else if (fieldType == Schema.Type.STRING) {
-        SimpleDateFormat format = dateFormat == null ? DEFAULT_FORMAT : dateFormat;
+        DateFormat format = dateFormat == null ? DEFAULT_FORMAT : dateFormat;
         fields.put(fieldName, format.format(date));
       } else {
         throw new UnexpectedFormatException("Date must be either a long or a string, not a " + fieldType);
@@ -162,11 +163,11 @@ public class StructuredRecord implements Serializable {
      * Convert the given string into the type of the given field, and set the value for that field. A String can be
      * converted to a boolean, int, long, float, double, bytes, string, or null.
      *
-     * @param fieldName Name of the field to set.
-     * @param strVal String value for the field.
-     * @return This builder.
+     * @param fieldName Name of the field to set
+     * @param strVal String value for the field
+     * @return This builder
      * @throws UnexpectedFormatException if the field is not in the schema, or the field is not nullable but a null
-     *                                   value is given, or the string cannot be converted to the type for the field.
+     *                                   value is given, or the string cannot be converted to the type for the field
      */
     public Builder convertAndSet(String fieldName, @Nullable String strVal) throws UnexpectedFormatException {
       Schema.Field field = validateAndGetField(fieldName, strVal);
@@ -177,8 +178,8 @@ public class StructuredRecord implements Serializable {
     /**
      * Build a {@link StructuredRecord} with the fields set by this builder.
      *
-     * @return A {@link StructuredRecord} with the fields set by this builder.
-     * @throws UnexpectedFormatException if there is at least one non-nullable field without a value.
+     * @return A {@link StructuredRecord} with the fields set by this builder
+     * @throws UnexpectedFormatException if there is at least one non-nullable field without a value
      */
     public StructuredRecord build() throws UnexpectedFormatException {
       // check that all non-nullable fields have a value.
