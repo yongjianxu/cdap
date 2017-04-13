@@ -157,6 +157,14 @@ public class AppMetadataStore extends MetadataStoreDataset {
   }
 
   public void writeApplication(String namespaceId, String appId, String versionId, ApplicationSpecification spec) {
+    if (versionId.equals(ApplicationId.DEFAULT_VERSION)) {
+      MDSKey mdsKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
+      ApplicationMeta appMeta = get(mdsKey, ApplicationMeta.class);
+      // If app meta exists for the application without a version, delete that key.
+      if (appMeta != null) {
+        delete(mdsKey);
+      }
+    }
     write(new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId, versionId).build(),
           new ApplicationMeta(appId, spec));
   }
@@ -181,12 +189,13 @@ public class AppMetadataStore extends MetadataStoreDataset {
   public void updateAppSpec(String namespaceId, String appId, String versionId, ApplicationSpecification spec) {
     LOG.trace("App spec to be updated: id: {}: spec: {}", appId, GSON.toJson(spec));
     MDSKey key = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId, versionId).build();
+    MDSKey versionLessKey = null;
     ApplicationMeta existing = getFirst(key, ApplicationMeta.class);
     ApplicationMeta updated;
 
     // Check again without the version to account for old data format if might not have been upgraded yet
     if (existing == null && (versionId.equals(ApplicationId.DEFAULT_VERSION))) {
-      MDSKey versionLessKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
+      versionLessKey = new MDSKey.Builder().add(TYPE_APP_META, namespaceId, appId).build();
       existing = getFirst(versionLessKey, ApplicationMeta.class);
     }
 
@@ -198,6 +207,11 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
     updated = ApplicationMeta.updateSpec(existing, spec);
     LOG.trace("Application exists in mds: id: {}, spec: {}", existing);
+
+    // Delete the old spec since the old spec has been replaced with this one.
+    if (versionLessKey != null) {
+      delete(versionLessKey);
+    }
     write(key, updated);
   }
 
@@ -285,6 +299,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
     MDSKey key = getProgramKeyBuilder(TYPE_RUN_RECORD_STARTED, programId).add(pid).build();
     if (versionLess) {
+      // This is true only in unit test cases.
       key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_STARTED, programId).add(pid).build();
     }
 
