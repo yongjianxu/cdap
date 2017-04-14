@@ -145,12 +145,7 @@ public class AppMetadataStore extends MetadataStoreDataset {
       splitter.skipBytes(); // skip recordType
       splitter.skipBytes(); // skip namespaceId
       splitter.skipBytes(); // skip appId
-      String versionId;
-      try {
-        versionId = splitter.getString();
-      } catch (BufferUnderflowException ex) {
-        versionId = ApplicationId.DEFAULT_VERSION;
-      }
+      String versionId = splitter.hasRemaining() ? splitter.getString() : ApplicationId.DEFAULT_VERSION;
       appIds.add(new NamespaceId(namespaceId).app(appId, versionId));
     }
     return appIds;
