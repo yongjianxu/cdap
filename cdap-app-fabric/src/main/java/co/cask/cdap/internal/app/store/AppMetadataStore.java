@@ -534,7 +534,6 @@ public class AppMetadataStore extends MetadataStoreDataset {
   private Map<ProgramRunId, RunRecordMeta> getNonCompleteRuns(@Nullable ProgramId programId, String recordType,
                                                               final long startTime, final long endTime, int limit,
                                                               Predicate<RunRecordMeta> filter) {
-    Map<MDSKey, RunRecordMeta> runRecordMap;
     Predicate<RunRecordMeta> valuePredicate = andPredicate(new Predicate<RunRecordMeta>() {
 
       @Override
@@ -545,13 +544,22 @@ public class AppMetadataStore extends MetadataStoreDataset {
 
     if (programId == null || !programId.getVersion().equals(ApplicationId.DEFAULT_VERSION)) {
       MDSKey key = getProgramKeyBuilder(recordType, programId).build();
-      runRecordMap = listKV(key, null, RunRecordMeta.class, limit, valuePredicate);
-    } else {
-      MDSKey key = getVersionLessProgramKeyBuilder(recordType, programId).build();
-      runRecordMap = listKV(key, null, RunRecordMeta.class, limit,
-                            new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), valuePredicate);
+      return getProgramRunIdMap(listKV(key, null, RunRecordMeta.class, limit, valuePredicate));
     }
-    return getProgramRunIdMap(runRecordMap);
+
+    Predicate<MDSKey> keyPredicate = new AppVersionPredicate(ApplicationId.DEFAULT_VERSION);
+    MDSKey key = getVersionLessProgramKeyBuilder(recordType, programId).build();
+    Map<MDSKey, RunRecordMeta> oldRecords = listKV(key, null, RunRecordMeta.class, limit, keyPredicate, valuePredicate);
+
+    int remaining = limit - oldRecords.size();
+    if (remaining > 0) {
+      // We need to scan twice since the scan key is modified based on whether we include the app version or not.
+      key = getProgramKeyBuilder(recordType, programId).build();
+      Map<MDSKey, RunRecordMeta> newRecords = listKV(key, null, RunRecordMeta.class, remaining, keyPredicate,
+                                                     valuePredicate);
+      oldRecords.putAll(newRecords);
+    }
+    return getProgramRunIdMap(oldRecords);
   }
 
   private Map<ProgramRunId, RunRecordMeta> getSuspendedRuns(Set<ProgramRunId> programRunIds, int limit) {
@@ -640,18 +648,18 @@ public class AppMetadataStore extends MetadataStoreDataset {
       return getHistoricalRuns(key, status, startTime, endTime, limit, null, filter);
     }
 
+    Predicate<MDSKey> keyPredicate = new AppVersionPredicate(ApplicationId.DEFAULT_VERSION);
     MDSKey key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
     Map<ProgramRunId, RunRecordMeta> oldRecords = getHistoricalRuns(
-      key, status, startTime, endTime, limit, null, filter);
+      key, status, startTime, endTime, limit, keyPredicate, filter);
 
     int remaining = limit - oldRecords.size();
-    key = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
-
     if (remaining > 0) {
       // We need to scan twice since the key is modified again in getHistoricalRuns since we want to use the
       // endTime and startTime to reduce the scan range
+      key = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
       Map<ProgramRunId, RunRecordMeta> newRecords = getHistoricalRuns(
-        key, status, startTime, endTime, remaining, new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), filter);
+        key, status, startTime, endTime, remaining, keyPredicate, filter);
       oldRecords.putAll(newRecords);
     }
     return oldRecords;
