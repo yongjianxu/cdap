@@ -641,8 +641,20 @@ public class AppMetadataStore extends MetadataStoreDataset {
     }
 
     MDSKey key = getVersionLessProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
-    return getHistoricalRuns(key, status, startTime, endTime, limit,
-                             new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), filter);
+    Map<ProgramRunId, RunRecordMeta> oldRecords = getHistoricalRuns(
+      key, status, startTime, endTime, limit, null, filter);
+
+    int remaining = limit - oldRecords.size();
+    key = getProgramKeyBuilder(TYPE_RUN_RECORD_COMPLETED, programId).build();
+
+    if (remaining > 0) {
+      // We need to scan twice since the key is modified again in getHistoricalRuns since we want to use the
+      // endTime and startTime to reduce the scan range
+      Map<ProgramRunId, RunRecordMeta> newRecords = getHistoricalRuns(
+        key, status, startTime, endTime, remaining, new AppVersionPredicate(ApplicationId.DEFAULT_VERSION), filter);
+      oldRecords.putAll(newRecords);
+    }
+    return oldRecords;
   }
 
   private Map<ProgramRunId, RunRecordMeta> getHistoricalRuns(MDSKey historyKey, ProgramRunStatus status,
